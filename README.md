@@ -38,7 +38,7 @@ flowchart LR
 The frame carries audit columns (`status`, `gate`, `reasons`, `scores`). A row is rejected at the first failing gate; later gates do not run on it, but the checks it passed are kept.
 
 - **Dedupe:** exact (SHA-1 of normalised text), near-duplicate (MinHash + LSH via `datasketch`, Jaccard 0.8 on 5-word shingles), semantic (all-MiniLM-L6-v2 cosine 0.95 within a category). A reason names the surviving twin.
-- **Quality:** length bounds and ratio, alphanumeric ratio, repeated n-grams, truncation heuristics, refusal/boilerplate phrases, language id (`lingua`), instruction-response relevance (MiniLM cosine). An optional SmolLM2-135M perplexity check exists but is off by default and is not part of any reported number.
+- **Quality:** length bounds and ratio, alphanumeric ratio, repeated n-grams, truncation heuristics, refusal/boilerplate phrases, language id (`lingua`), instruction-response relevance (MiniLM cosine). An optional SmolLM2-135M-Instruct perplexity check exists; I measured it (section 3 of the results) and it stays off by default.
 - **Safety:** regex PII (email, phone, card with Luhn, SSN-like, IPv4, IBAN) redacted to typed placeholders by default; secret patterns and private-key blocks rejected; toxicity with `unitary/toxic-bert`, scoring long texts in chunks and taking the worst one. Rows in the `classification` category are exempt from the toxicity gate because that task legitimately quotes toxic text.
 - **Balance and export:** no category may exceed `max_share` of the final set (skipped below 100 survivors), then a seeded stratified split.
 
@@ -167,6 +167,80 @@ Where it falls short, plainly:
 - **Toxicity (51% recall).** The injected snippets are mild-to-moderate prompts from RealToxicityPrompts. At the dev-tuned threshold of 0.5, toxic-bert misses about half. Raising recall costs false rejects on untouched rows; I kept the precision-leaning setting.
 - Precision per gate counts a rejection as correct when the row was an injected defect of any kind, so it is slightly generous to gates that catch another gate's defect.
 
+### 3. The optional perplexity check
+
+The quality gate can also reject responses whose perplexity under SmolLM2-135M-Instruct is high (`quality.perplexity` in the config; the response is scored on its own, not conditioned on the instruction). The question was whether it catches the defects the rules miss, truncated and off-topic rows, without rejecting good rows. `python scripts/eval_perplexity.py` tunes it on the dev slice and applies the result to the bench slice (`results/perplexity_check.json`).
+
+<!-- gen:perplexity -->
+Dev slice (3,180 rows), tuned there: the rule, fixed before I looked at the bench slice, was that some `max_ppl` must raise the recall of the truncated and off-topic rows by at least 5 percentage points while the false-reject rate on untouched rows rises by at most 0.1 points.
+
+| max_ppl | Recall of truncated + off-topic rows | False-reject rate on untouched rows | Rejected for high perplexity (injected) |
+|---:|---:|---:|---:|
+| check off | 63.3% (76 of 120) | 1.75% (45 of 2565) | 0 (0) |
+| 150 | 64.2% (77 of 120) | 15.83% (406 of 2565) | 368 (6) |
+| 250 | 64.2% (77 of 120) | 12.79% (328 of 2565) | 286 (2) |
+| 400 | 63.3% (76 of 120) | 11.07% (284 of 2565) | 241 (1) |
+| 600 | 63.3% (76 of 120) | 9.32% (239 of 2565) | 196 (1) |
+| 1000 | 63.3% (76 of 120) | 7.99% (205 of 2565) | 161 (0) |
+| 1500 | 63.3% (76 of 120) | 6.90% (177 of 2565) | 133 (0) |
+| 2500 | 63.3% (76 of 120) | 5.89% (151 of 2565) | 107 (0) |
+
+The raw score also separates the defects poorly: the ROC AUC of the response perplexity for truncated rows against untouched rows is 0.40 on dev and 0.42 on bench, and for off-topic rows 0.43 on dev and 0.41 on bench (0.5 is chance). On the bench slice at the default `max_ppl` 2500, the recall of those rows is 63.3% against 63.3% with the check off, while the false-reject rate on untouched rows rises from 1.64% to 5.46%. No threshold met the rule on the dev slice, so the check stays off by default. The untouched rows that the loosest threshold (2500) flags on the dev slice are mostly short answers: their median length is 2 words against 32 for the rest.
+<!-- /gen:perplexity -->
+
+As implemented, the check is a net loss, so I left it off. It adds no recall on the defects the rules miss and it rejects many good rows, mostly short answers whose perplexity out of context is naturally high. Truncated and off-topic rows also score lower perplexity than ordinary rows, not higher: a cut-off sentence or an unrelated but fluent sentence is just as predictable as a good answer, and the response is scored without its instruction, so relevance cannot show up. Scoring the response given the instruction, or normalising for length, might do better; I did not test either, and the evidence above is for this form of the check only.
+
+### 4. Does cleaning help a model? A fine-tuning comparison
+
+The benchmark shows that the gates catch injected defects. This section asks the downstream question: does a small model trained on the cleaned data behave better than one trained on the contaminated data? After `python scripts/fetch_data.py` and `python scripts/make_benchmark.py --slice bench --seed 2026`, `python scripts/finetune_compare.py` trains and scores every run (it resumes from `results/finetune/runs/`), then writes `results/finetune/results.json`, which the web UI's "Does cleaning help a model?" section reads. No weights are saved.
+
+![The fine-tuning comparison in the web UI](docs/assets/desktop-finetune.png)
+
+<!-- gen:ft_setup -->
+SmolLM2-135M-Instruct was fine-tuned in float32 on the GPU for 400 optimiser steps of 8 examples (micro-batches of 1), AdamW at a peak learning rate of 2e-05 with 20 warm-up steps and cosine decay, loss on the response tokens only, 3 seeds per training set. A run took 7.3 to 21.6 minutes of training and used at most 3.3 GiB of GPU memory (reserved; capped at 3.9 GiB). Device: `cuda (NVIDIA GeForce RTX 5060 Ti), float32`.
+
+Training sets, all from the benchmark slice: **raw** is the whole slice (3,180 rows, 615 with an injected defect); **cleaned** is what SFT Forge keeps (2,521 rows, of which 154 still carry an injected defect: 36 truncated, 22 toxic, 15 PII iban, 15 PII ssn, 14 PII email, 14 PII card, 14 PII phone, 13 PII ipv4, 7 off topic, 2 wrong language, 2 paraphrase dup); **random** is a fresh random subsample of the raw slice with 2,521 rows per seed (on average 492 injected defects). With 3,200 examples drawn per run, the model sees the raw set 1.0 times and the cleaned and random sets 1.3 times. Every run is scored on 300 held-out Dolly rows (rows 11000-12000 of the shuffled data, minus any whose prompt appears in the training slice) that none of the training sets contain, with greedy generations of up to 160 new tokens.
+<!-- /gen:ft_setup -->
+
+Measures, all computed on the held-out generations or reference answers: held-out loss; the share of outputs flagged by the pipeline's own refusal/boilerplate detector; outputs that stop on their own mid-sentence (the truncation heuristics); outputs the language detector reads as non-English; outputs containing PII- or secret-shaped strings (the pipeline's own detectors); outputs in which at least half of the 8-word sequences occur in a training response; ROUGE-L F1 and MiniLM cosine similarity against the reference answer. Several of these use the same detectors the gates use, so they measure whether the model learned the defect, not an independent judgement of quality.
+
+<!-- gen:ft_table -->
+| Measure | Untuned | Raw | Cleaned | Random, same size |
+|---|---:|---:|---:|---:|
+| Held-out loss (reference answers) (lower is better) | 2.419 | 2.244 ± 0.000 | 2.246 ± 0.000 | 2.246 ± 0.001 |
+| Refusal or boilerplate outputs (lower is better) | 0.7% | 0.3% ± 0.0% | 0.2% ± 0.2% | 0.2% ± 0.2% |
+| Outputs that stop mid-sentence (lower is better) | 0.0% | 0.3% ± 0.0% | 0.7% ± 0.0% | 0.7% ± 0.3% |
+| Non-English outputs (lower is better) | 0.0% | 0.1% ± 0.2% | 0.2% ± 0.2% | 0.3% ± 0.3% |
+| Outputs with PII- or secret-shaped strings (lower is better) | 0.0% | 0.0% ± 0.0% | 0.1% ± 0.2% | 0.0% ± 0.0% |
+| Near-verbatim copies of training rows (lower is better) | 0.0% | 0.0% ± 0.0% | 0.0% ± 0.0% | 0.0% ± 0.0% |
+| ROUGE-L F1 against the reference (higher is better) | 0.184 | 0.251 ± 0.006 | 0.257 ± 0.003 | 0.251 ± 0.002 |
+| MiniLM cosine similarity to the reference (higher is better) | 0.650 | 0.657 ± 0.002 | 0.667 ± 0.003 | 0.658 ± 0.000 |
+| Held-out perplexity (lower is better) | 11.24 | 9.43 ± 0.00 | 9.45 ± 0.00 | 9.45 ± 0.01 |
+<!-- /gen:ft_table -->
+
+Paired by seed, with a 95% t-interval over the seeds (a seed fixes the data order and, for the random subsample, which rows are drawn):
+
+<!-- gen:ft_paired -->
+| Measure | Cleaned − raw (95% interval) | Cleaned − random (95% interval) |
+|---|---:|---:|
+| Held-out loss (reference answers) | +0.002 [+0.001, +0.003] **worse** | +0.000 [−0.001, +0.002] |
+| Refusal or boilerplate outputs | −0.1 pts [−0.6 pts, +0.4 pts] | +0.0 pts [+0.0 pts, +0.0 pts] |
+| Outputs that stop mid-sentence | +0.3 pts [+0.3 pts, +0.3 pts] **worse** | +0.0 pts [−0.8 pts, +0.8 pts] |
+| Non-English outputs | +0.1 pts [−0.4 pts, +0.6 pts] | −0.1 pts [−0.6 pts, +0.4 pts] |
+| Outputs with PII- or secret-shaped strings | +0.1 pts [−0.4 pts, +0.6 pts] | +0.1 pts [−0.4 pts, +0.6 pts] |
+| Near-verbatim copies of training rows | +0.0 pts [+0.0 pts, +0.0 pts] | +0.0 pts [+0.0 pts, +0.0 pts] |
+| ROUGE-L F1 against the reference | +0.007 [−0.014, +0.028] | +0.006 [−0.001, +0.014] |
+| MiniLM cosine similarity to the reference | +0.010 [−0.000, +0.020] | +0.009 [+0.002, +0.016] **better** |
+<!-- /gen:ft_paired -->
+
+<!-- gen:ft_verdict -->
+All three fine-tuned sets moved the model the same way and by about the same amount: held-out loss fell from 2.419 for the untuned model to 2.244 (raw), 2.246 (cleaned) and 2.246 (random), and ROUGE-L rose from 0.184 to 0.251, 0.257 and 0.251. Against raw, the cleaned set was statistically worse on held-out loss (reference answers) (+0.002); outputs that stop mid-sentence (+0.3 pts), meaning the 3-seed 95% interval excludes zero. Against the size-matched random subsample, the cleaned set was statistically better on miniLM cosine similarity to the reference (+0.009), meaning the 3-seed 95% interval excludes zero.
+<!-- /gen:ft_verdict -->
+
+**Reading it plainly.** At this scale, cleaning with SFT Forge made no practical difference to the model. Fine-tuning on any of the three sets moved the model toward the Dolly answer style and improved the loss and the ROUGE-L score by the same amount, and the differences between the sets are within a few thousandths on loss and about a hundredth on the similarity scores, or amount to a single prompt out of the held-out set. Where an interval excludes zero (see the paired table), the effect is tiny and points in different directions for different measures: against the raw set the flagged differences are on held-out loss and on one output that stops mid-sentence, both slightly in raw's favour, and against the size-matched random subsample the only flagged difference is a MiniLM similarity gain of about a hundredth. With eight measures and three seeds, one borderline interval is weak evidence, so I cannot attribute any gain to the cleaning rather than to chance or to the size of the set.
+
+Likely reasons, none of which I have tested here: the defects are a modest share of the data (a fifth of the rows, split over many types), and one pass of a short budget teaches a small instruction-tuned model mostly the answer style, not individual defects; duplicates and memorised rows matter most when a set is repeated for several epochs, and here each set is seen about once, so verbatim copying never appears; the held-out prompts are ordinary questions that rarely invite a refusal or a different language; with 300 prompts one output moves a rate by a third of a percentage point, so rare behaviours are below the resolution of this evaluation; and the base model is already instruction-tuned, so there is little refusal boilerplate for contaminated data to add. A larger model, a longer or multi-epoch run, a higher contamination rate, or an evaluation aimed at the specific defects might show an effect; this experiment does not.
+
 ## The recorded demo format
 
 The static demo must load quickly on a phone, so a recorded run is an index plus chunks, written by `scripts/run_dolly.py` and `scripts/eval_benchmark.py --recorded-dir`:
@@ -196,7 +270,7 @@ Text is clipped in the detail files (instruction 240, context 120, response 380 
 <!-- gen:throughput -->
 - CPU throughput is the limit on machines without a GPU. `scripts/throughput.py` times the first 500 rows of the committed sample with model loading included: 216 s on the CPU (3 threads, 2.3 rows per second, safety 164 s) and 20 s on the GPU (24.4 rows per second). The machine and its GPU were shared with other jobs, so these figures vary several-fold between runs and are indicative only. Live mode is capped at 500 rows for that reason.
 <!-- /gen:throughput -->
-- I did not train any model on the cleaned data, so I make no claim about its effect on downstream quality.
+- The fine-tuning comparison is small: one 135M-parameter model, one contaminated slice with defects I injected, a short training budget, three seeds and a 300-row held-out set. It says what these defects teach this model under this budget, and it cannot speak to larger models, real web data or longer training.
 - Only the local pipeline paths are implemented; there are no hosted-model adapters.
 
 ## Tests
@@ -215,7 +289,7 @@ CI (`.github/workflows/ci.yml`) runs lint and the fast tests. The web UI is chec
 ```
 src/sftforge/   loaders, normalize, gates/, detectors/, balance, export, card, audit, pipeline, cli, server/
 configs/        default.yaml (every threshold)
-scripts/        fetch_data, make_benchmark, eval_benchmark, run_dolly, record_messy, throughput, check_numbers, smoke, shoot, check_ui
+scripts/        fetch_data, make_benchmark, eval_benchmark, eval_perplexity, finetune_compare, run_dolly, record_messy, throughput, check_numbers, smoke, shoot, check_ui
 docs/           web UI (served locally and as a static demo), data/ recorded runs, assets/, notes/ (research, spec)
 examples/       messy_sample.jsonl: 60 hand-written rows with every defect type (MIT)
 data_sample/    1,000 cleaned Dolly rows (CC BY-SA 3.0, see NOTICE.md)
@@ -227,7 +301,7 @@ tests/
 
 - **Code:** MIT, copyright Aditya Jain (see `LICENSE`).
 - **`data_sample/` and the text shown in the recorded demo runs:** derived from [databricks-dolly-15k](https://huggingface.co/datasets/databricks/databricks-dolly-15k) by Databricks, Inc. and Wikipedia contributors, licensed **CC BY-SA 3.0**. These files stay under CC BY-SA 3.0, not MIT. Changes: filtered, de-duplicated, PII-redacted and balanced.
-- Models: [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) (Apache-2.0), [unitary/toxic-bert](https://huggingface.co/unitary/toxic-bert) (Apache-2.0), optional [SmolLM2-135M](https://huggingface.co/HuggingFaceTB/SmolLM2-135M) (Apache-2.0).
+- Models: [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) (Apache-2.0), [unitary/toxic-bert](https://huggingface.co/unitary/toxic-bert) (Apache-2.0), [SmolLM2-135M-Instruct](https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct) (Apache-2.0), used for the optional perplexity check and as the model in the fine-tuning comparison.
 - Benchmark sources: [OpenAssistant/oasst1](https://huggingface.co/datasets/OpenAssistant/oasst1) and [allenai/real-toxicity-prompts](https://huggingface.co/datasets/allenai/real-toxicity-prompts) (both Apache-2.0), downloaded by script and not committed.
 - Libraries: pandas, Hugging Face Datasets, datasketch, lingua-language-detector, sentence-transformers, FastAPI.
 

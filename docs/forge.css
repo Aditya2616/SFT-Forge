@@ -214,3 +214,19 @@ footer a { display: inline-flex; align-items: center; min-height: 44px; padding:
 .why-blk .th { color: var(--dim); }
 .why-blk.ok { border-color: var(--lime); background: color-mix(in srgb, var(--lime) 7%, transparent); }
 .why-blk.ok b { color: var(--accent-text); }
+
+/* downstream experiment view */
+.legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 6px 0 14px; font-family: var(--mono); font-size: 11.5px; color: var(--mute); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.ft-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; }
+.ft-card { border: 1px solid var(--line); border-radius: 16px; padding: 14px; background: var(--panel); font-family: var(--mono); font-size: 11.5px; }
+.ft-card h4 { margin: 0 0 10px; font-weight: 500; font-size: 12px; color: var(--bone); letter-spacing: .02em; }
+.ft-card .hint { color: var(--dim); font-size: 10.5px; margin-left: 6px; }
+.ft-card svg { width: 100%; height: auto; display: block; }
+.ft-card .delta { margin-top: 8px; color: var(--dim); line-height: 1.6; }
+.ft-card .delta b { color: var(--bone); font-weight: 500; }
+.ft-card .delta .sig { color: var(--accent-text); }
+.ft-card text { font-family: var(--mono); fill: var(--mute); }
+#ft-curves svg { width: 100%; height: auto; display: block; }
+#ft-curves text { font-family: var(--mono); fill: var(--dim); font-size: 10px; }
+.ft-card .delta .bad { color: var(--ember-text); }

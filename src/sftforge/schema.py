@@ -17,7 +17,7 @@ class ModelsCfg(_Cfg):
     embedder_revision: str | None = None
     toxicity: str = "unitary/toxic-bert"
     toxicity_revision: str | None = None
-    perplexity: str = "HuggingFaceTB/SmolLM2-135M"
+    perplexity: str = "HuggingFaceTB/SmolLM2-135M-Instruct"
     perplexity_revision: str | None = None
 
 

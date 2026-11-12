@@ -19,7 +19,7 @@ Gate 2, quality (transparent rules; each threshold in YAML; each rule a pure fun
 - truncation (ends mid-sentence, dangling bracket or code fence); refusal/boilerplate phrase list.
 - language id (lingua, subset, confidence), allowed languages in config.
 - relevance: cosine(instruction, response) from MiniLM below a threshold, with per-category exemptions.
-- optional perplexity from SmolLM2-135M (off by default for speed; not used in any reported run).
+- optional perplexity from SmolLM2-135M (off by default; see the measurement in section 7).
 - combined 0-1 quality score for the UI and for balancing tie-breaks; the verdict itself comes from hard rules.
 
 Gate 3, safety
@@ -81,6 +81,7 @@ Loaders for each format including malformed lines; normalisation; exact and near
 - Threshold checking uses a seeded synthetic contamination benchmark (`scripts/make_benchmark.py`, `scripts/eval_benchmark.py`) with known defects and ground truth, tuned on a dev slice and reported on a separate bench slice, instead of a hand-labelled sample. There is no `label_sample` script.
 - There is a single config, `configs/default.yaml`; no `strict.yaml`.
 - The web UI lives in `docs/` only and is served from there by FastAPI.
-- The before/after fine-tuning experiment was dropped and is not part of this project.
+- The before/after fine-tuning experiment was first dropped, then built: `scripts/finetune_compare.py` (raw, cleaned and size-matched random sets, three seeds, SmolLM2-135M-Instruct, GPU), with results in `results/finetune/` and a view in the web UI.
+- The optional perplexity check was measured (`scripts/eval_perplexity.py`, `results/perplexity_check.json`) and stays off by default; it uses SmolLM2-135M-Instruct because that is the SmolLM2 checkpoint I had cached.
 - Recorded demo runs are an index plus detail chunks (`docs/data/<run>/`), not one JSON file, so the first load stays small.
 - Model device is chosen automatically (CUDA if available, else CPU) and recorded in the audit.

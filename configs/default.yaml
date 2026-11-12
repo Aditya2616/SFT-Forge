@@ -6,8 +6,8 @@ models:
   embedder_revision: 1110a243fdf4706b3f48f1d95db1a4f5529b4d41
   toxicity: unitary/toxic-bert
   toxicity_revision: 4d6c22e74ba2fdd26bc4f7238f50766b045a0d94
-  perplexity: HuggingFaceTB/SmolLM2-135M
-  perplexity_revision: 93efa2f097d58c2a74874c7e644dbc9b0cee75a2
+  perplexity: HuggingFaceTB/SmolLM2-135M-Instruct
+  perplexity_revision: 12fd25f77366fa6b3b4b768ec3050bf629380bac
 
 normalize:
   strip_citations: true        # removes Wikipedia-style [12] markers from context and response
@@ -47,7 +47,7 @@ quality:
     min_cosine: 0.10           # max(cos(instruction, response), cos(context, response))
     min_response_words: 8      # very short answers ("Yes", a name) are not judged on relevance
   perplexity:
-    enabled: false             # SmolLM2-135M mean token loss on the response; slow on CPU
+    enabled: false             # SmolLM2-135M-Instruct perplexity of the response; off by evidence (results/perplexity_check.json)
     max_ppl: 2500
 
 safety:

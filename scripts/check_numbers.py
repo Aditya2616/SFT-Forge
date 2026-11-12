@@ -208,10 +208,145 @@ def block_throughput(s: dict) -> str:
             "capped at 500 rows for that reason.")
 
 
+
+def block_perplexity(s: dict) -> str:
+    r = s["ppl"]
+    cfg = s["cfg"]["quality"]["perplexity"]
+    assert cfg["enabled"] == r["enable_by_default"], "configs/default.yaml disagrees with the perplexity evidence"
+    if r["chosen_max_ppl"]:
+        assert cfg["max_ppl"] == r["chosen_max_ppl"]
+    assert s["cfg"]["models"]["perplexity"] == r["model"]
+    dev, bench = r["dev"], r["bench"]
+    rows = ["| max_ppl | Recall of truncated + off-topic rows | False-reject rate on untouched rows | Rejected for high perplexity (injected) |",
+            "|---:|---:|---:|---:|"]
+    for k, v in dev["settings"].items():
+        label = "check off" if k == "off" else k
+        rows.append(f"| {label} | {100 * v['target_recall']:.1f}% ({v['target_caught']} of {v['target_n']}) | "
+                    f"{100 * v['false_reject_rate']:.2f}% ({v['false_rejects']} of {v['untouched_n']}) | "
+                    f"{v['high_perplexity_rejects']} ({v['high_perplexity_on_injected']}) |")
+    b_off = bench["settings"]["off"]
+    b_on = next(v for k, v in bench["settings"].items() if k != "off")
+    rule = r["rule"]
+    verdict = (f"A threshold met the rule on the dev slice (max_ppl {r['chosen_max_ppl']}), so the check is on by default."
+               if r["enable_by_default"] else "No threshold met the rule on the dev slice, so the check stays off by default.")
+    return (f"Dev slice ({dev['n_rows']:,} rows), tuned there: the rule, fixed before I looked at the bench slice, was that "
+            f"some `max_ppl` must raise the recall of the truncated and off-topic rows by at least {rule['min_gain_pp']:g} "
+            f"percentage points while the false-reject rate on untouched rows rises by at most {rule['max_extra_false_pp']:g} points.\n\n"
+            + "\n".join(rows) + "\n\n"
+            f"The raw score also separates the defects poorly: the ROC AUC of the response perplexity for truncated rows against "
+            f"untouched rows is {dev['auc_vs_untouched']['truncated']:.2f} on dev and {bench['auc_vs_untouched']['truncated']:.2f} "
+            f"on bench, and for off-topic rows {dev['auc_vs_untouched']['off_topic']:.2f} on dev and "
+            f"{bench['auc_vs_untouched']['off_topic']:.2f} on bench (0.5 is chance). On the bench slice at the default "
+            f"`max_ppl` {b_on['max_ppl']}, the recall of those rows is {100 * b_on['target_recall']:.1f}% against "
+            f"{100 * b_off['target_recall']:.1f}% with the check off, while the false-reject rate on untouched rows rises from "
+            f"{100 * b_off['false_reject_rate']:.2f}% to {100 * b_on['false_reject_rate']:.2f}%. {verdict} The untouched rows that the loosest threshold ({dev['untouched_flagged_at_loosest']['max_ppl']}) flags on the dev slice are mostly short answers: their median length is "
+            f"{dev['untouched_flagged_at_loosest']['median_words']:g} words against {dev['untouched_flagged_at_loosest']['median_words_not_flagged']:g} for the rest.")
+
+
+def _ft_fmt(key: str, v: float) -> str:
+    return f"{100 * v:.1f}%" if key.endswith("rate") else f"{v:.3f}"
+
+
+def _ft_pm(key: str, e: dict) -> str:
+    return f"{_ft_fmt(key, e['mean'])} ± {_ft_fmt(key, e['sd'])}"
+
+
+def block_ft_setup(s: dict) -> str:
+    f = s["ft"]
+    c, d = f["config"], f["data"]
+    conds = f["conditions"]
+    secs = [x for k in ("raw", "cleaned", "random") for x in conds[k]["train_seconds"]]
+    inj_rand = conds["random"]["injected_rows"]
+    defects = ", ".join(f"{v} {k.replace('_', ' ').replace('pii', 'PII')}" for k, v in sorted(d["cleaned_defects"].items(), key=lambda kv: -kv[1]))
+    return (f"{c['model'].split('/')[1]} was fine-tuned in {c['precision']} on the {device_kind(f['device'])} for "
+            f"{c['steps']} optimiser steps of {c['batch_size']} examples (micro-batches of {c['micro_batch']}), AdamW at a peak learning "
+            f"rate of {c['lr']:g} with {c['warmup_steps']} warm-up steps and cosine decay, loss on the response tokens only, "
+            f"{len(c['seeds'])} seeds per training set. A run took {min(secs) / 60:.1f} to {max(secs) / 60:.1f} minutes of training "
+            f"and used at most {max(conds[k]['peak_vram_gib'] for k in ('raw', 'cleaned', 'random')):.1f} GiB of GPU memory "
+            f"(reserved; capped at {c['vram_cap_gib']:g} GiB). Device: `{f['device']}`.\n\n"
+            f"Training sets, all from the benchmark slice: **raw** is the whole slice ({d['raw_rows']:,} rows, {d['injected_in_raw']} "
+            f"with an injected defect); **cleaned** is what SFT Forge keeps ({d['cleaned_rows']:,} rows, of which "
+            f"{d['injected_in_cleaned']} still carry an injected defect: {defects}); **random** is a fresh random subsample of the raw "
+            f"slice with {d['cleaned_rows']:,} rows per seed (on average {sum(inj_rand) / len(inj_rand):.0f} injected defects). "
+            f"With {c['steps'] * c['batch_size']:,} examples drawn per run, the model sees the raw set {c['steps'] * c['batch_size'] / d['raw_rows']:.1f} "
+            f"times and the cleaned and random sets {c['steps'] * c['batch_size'] / d['cleaned_rows']:.1f} times. "
+            f"Every run is scored on {d['heldout_rows']} held-out Dolly rows (rows {SLICES['heldout'][0]}-{SLICES['heldout'][1]} "
+            "of the shuffled data, minus any whose prompt appears in the training slice) that none of the training sets contain, "
+            f"with greedy generations of up to {c['max_new_tokens']} new tokens.")
+
+
+def block_ft_table(s: dict) -> str:
+    f = s["ft"]
+    conds = [k for k in ("base", "raw", "cleaned", "random") if k in f["conditions"]]
+    head = {"base": "Untuned", "raw": "Raw", "cleaned": "Cleaned", "random": "Random, same size"}
+    rows = ["| Measure | " + " | ".join(head[k] for k in conds) + " |", "|---|" + "---:|" * len(conds)]
+    for m in f["metrics"]:
+        arrow = "higher is better" if m["better"] > 0 else "lower is better"
+        rows.append(f"| {m['label']} ({arrow}) | " + " | ".join(
+            (_ft_fmt(m["key"], f["conditions"][k]["metrics"][m["key"]]["mean"]) if k == "base" else _ft_pm(m["key"], f["conditions"][k]["metrics"][m["key"]]))
+            for k in conds) + " |")
+    ppl = {k: [x for x in f["conditions"][k]["perplexity"]] for k in conds}
+    rows.append("| Held-out perplexity (lower is better) | " + " | ".join(
+        f"{sum(ppl[k]) / len(ppl[k]):.2f}" + ("" if k == "base" else f" ± {(sum((x - sum(ppl[k]) / len(ppl[k])) ** 2 for x in ppl[k]) / (len(ppl[k]) - 1)) ** 0.5:.2f}")
+        for k in conds) + " |")
+    return "\n".join(rows)
+
+
+def block_ft_paired(s: dict) -> str:
+    f = s["ft"]
+    rows = ["| Measure | Cleaned − raw (95% interval) | Cleaned − random (95% interval) |", "|---|---:|---:|"]
+
+    def cell(key: str, d: dict) -> str:
+        def sgn(v: float) -> str:
+            body = f"{100 * abs(v):.1f} pts" if key.endswith("rate") else f"{abs(v):.3f}"
+            return ("+" if v >= 0 else "−") + body
+        tag = "" if not d["excludes_zero"] else (" **better**" if d["favours_cleaned"] else " **worse**")
+        return f"{sgn(d['mean_diff'])} [{sgn(d['ci95'][0])}, {sgn(d['ci95'][1])}]{tag}"
+
+    for m in f["metrics"]:
+        a, b = f["paired"]["cleaned_minus_raw"][m["key"]], f["paired"]["cleaned_minus_random"][m["key"]]
+        rows.append(f"| {m['label']} | {cell(m['key'], a)} | {cell(m['key'], b)} |")
+    return "\n".join(rows)
+
+
+def block_ft_verdict(s: dict) -> str:
+    f = s["ft"]
+    c = f["conditions"]
+    n_seeds = len(f["config"]["seeds"])
+
+    def sgn(key: str, v: float) -> str:
+        body = f"{100 * abs(v):.1f} pts" if key.endswith("rate") else f"{abs(v):.3f}"
+        return ("+" if v >= 0 else "−") + body
+
+    mean = lambda k, m: c[k]["metrics"][m]["mean"]  # noqa: E731
+    head = (f"All three fine-tuned sets moved the model the same way and by about the same amount: held-out loss fell from "
+            f"{mean('base', 'loss'):.3f} for the untuned model to {mean('raw', 'loss'):.3f} (raw), {mean('cleaned', 'loss'):.3f} "
+            f"(cleaned) and {mean('random', 'loss'):.3f} (random), and ROUGE-L rose from {mean('base', 'rouge_l'):.3f} to "
+            f"{mean('raw', 'rouge_l'):.3f}, {mean('cleaned', 'rouge_l'):.3f} and {mean('random', 'rouge_l'):.3f}.")
+    parts = [head]
+    for key, name in (("cleaned_minus_raw", "raw"), ("cleaned_minus_random", "the size-matched random subsample")):
+        better = [f"{m['label'][0].lower() + m['label'][1:]} ({sgn(m['key'], f['paired'][key][m['key']]['mean_diff'])})" for m in f["metrics"]
+                  if f["paired"][key][m["key"]]["favours_cleaned"] is True]
+        worse = [f"{m['label'][0].lower() + m['label'][1:]} ({sgn(m['key'], f['paired'][key][m['key']]['mean_diff'])})" for m in f["metrics"]
+                 if f["paired"][key][m["key"]]["favours_cleaned"] is False]
+        if not better and not worse:
+            parts.append(f"Against {name}, no measure had a paired {n_seeds}-seed 95% interval that excludes zero.")
+        else:
+            bits = []
+            if better:
+                bits.append("statistically better on " + "; ".join(better))
+            if worse:
+                bits.append("statistically worse on " + "; ".join(worse))
+            parts.append(f"Against {name}, the cleaned set was " + " and ".join(bits) + ", meaning the {n}-seed 95% interval excludes zero.".replace("{n}", str(n_seeds)))
+    return " ".join(parts)
+
+
 BLOCKS = {
     "slices": block_slices, "device": block_device, "messy": block_messy, "dolly": block_dolly,
     "bench_intro": block_bench_intro, "bench_recall": block_bench_recall, "bench_gates": block_bench_gates,
     "bench_false": block_bench_false, "demo": block_demo, "throughput": block_throughput,
+    "perplexity": block_perplexity, "ft_setup": block_ft_setup, "ft_table": block_ft_table,
+    "ft_paired": block_ft_paired, "ft_verdict": block_ft_verdict,
 }
 
 
@@ -229,6 +364,7 @@ def sources() -> dict:
         "idx_dolly": idx_d, "idx_bench": idx_b, "sample_skipped": skipped, "docs_data_bytes": data_bytes,
         "size_dolly_index": (ROOT / "docs/data/dolly/index.json").stat().st_size,
         "size_bench_index": (ROOT / "docs/data/contaminated/index.json").stat().st_size,
+        "ppl": load("results/perplexity_check.json"), "ft": load("results/finetune/results.json"),
         "cfg": yaml.safe_load((ROOT / "configs" / "default.yaml").read_text(encoding="utf-8")),
     }
 
@@ -299,6 +435,18 @@ def prose_checks(text: str, s: dict) -> list[str]:
         bad.append("docs/data/dolly/index.json and results/dolly_headline.json disagree on rows_kept")
     if s["idx_bench"]["audit"]["rows_kept"] != b["audit"]["rows_kept"]:
         bad.append("docs/data/contaminated/index.json and results/benchmark_bench.json disagree on rows_kept")
+    if (ROOT / "docs" / "data" / "finetune.json").read_text(encoding="utf-8") != (ROOT / "results" / "finetune" / "results.json").read_text(encoding="utf-8"):
+        bad.append("docs/data/finetune.json differs from results/finetune/results.json")
+    ft = s["ft"]
+    for key in ("raw", "cleaned", "random"):
+        if any(len(v["values"]) != len(ft["config"]["seeds"]) for v in ft["conditions"][key]["metrics"].values()):
+            bad.append(f"fine-tune results: {key} does not have one value per seed")
+    if ft["conditions"]["cleaned"]["train_rows"][0] != ft["data"]["cleaned_rows"] or ft["data"]["cleaned_rows"] != s["bench"]["audit"]["rows_kept"]:
+        bad.append("the cleaned training set size differs from the rows kept in the benchmark run")
+    if ft["conditions"]["random"]["train_rows"][0] != ft["data"]["cleaned_rows"]:
+        bad.append("the random subsample is not the size of the cleaned set")
+    if ft["data"]["raw_rows"] != s["bench"]["audit"]["rows_in"]:
+        bad.append("the raw training set is not the whole benchmark slice")
     # what the UI counts from each recorded run's rows must equal that run's audit and the results file
     for name, idx, res in (("dolly", s["idx_dolly"], s["dolly"]), ("benchmark", s["idx_bench"], s["bench"]["audit"])):
         rows = idx["rows"]

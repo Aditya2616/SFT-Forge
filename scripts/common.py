@@ -8,8 +8,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DOLLY = ROOT / "data" / "databricks-dolly-15k" / "databricks-dolly-15k.jsonl"
 SPLIT_SEED = 7
-# Three disjoint slices of the shuffled Dolly rows: threshold tuning, benchmark report, headline run.
-SLICES = {"dev": (0, 3000), "bench": (3000, 6000), "headline": (6000, 11000)}
+# Four disjoint slices of the shuffled Dolly rows: threshold tuning, benchmark report, headline run, and the
+# held-out rows used to evaluate the fine-tuning comparison.
+SLICES = {"dev": (0, 3000), "bench": (3000, 6000), "headline": (6000, 11000),
+          "heldout": (11000, 12000)}
 
 
 def read_jsonl(path: Path) -> list[dict]:

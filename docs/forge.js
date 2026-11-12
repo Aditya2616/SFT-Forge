@@ -654,6 +654,59 @@ $('#go').addEventListener('click', async () => {
 });
 $('#exportzip').addEventListener('click', () => { if (app.live.job) location.href = 'api/run/' + app.live.job + '/export.zip'; });
 
+/* ---------------------------------------------------------------- downstream fine-tuning experiment (from data/finetune.json) */
+const FT_COLORS = { raw: 'var(--ember)', cleaned: 'var(--lime)', random: 'var(--dim)' };
+const FT_NAMES = { raw: 'Raw (contaminated as is)', cleaned: 'Cleaned by SFT Forge', random: 'Random, same size as cleaned' };
+const ftNum = (v, key) => (key.endsWith('rate') ? (100 * v).toFixed(1) + '%' : v.toFixed(3));
+function ftCard(m, S) {
+  const conds = ['raw', 'cleaned', 'random'].filter((c) => S.conditions[c]);
+  const vals = conds.flatMap((c) => { const s = S.conditions[c].metrics[m.key]; return s.values.concat([s.mean + s.sd]); });
+  const base = S.conditions.base?.metrics[m.key]?.mean;
+  const top = Math.max(1e-9, ...vals, base ?? 0) * 1.12, W = 300, L = 4, R = W - 74, rowH = 30;
+  const x = (v) => L + (R - L) * (v / top);
+  let svg = `<svg viewBox="0 0 ${W} ${conds.length * rowH + 6}" role="img" aria-label="${esc(m.label)} by training set">`;
+  conds.forEach((c, i) => {
+    const s = S.conditions[c].metrics[m.key], y = 6 + i * rowH;
+    svg += `<rect x="${L}" y="${y}" width="${R - L}" height="14" rx="3" fill="var(--line)"/><rect x="${L}" y="${y}" width="${Math.max(1.5, x(s.mean) - L).toFixed(1)}" height="14" rx="3" fill="${FT_COLORS[c]}" opacity=".85"/>`;
+    svg += `<line x1="${x(Math.max(0, s.mean - s.sd)).toFixed(1)}" x2="${x(s.mean + s.sd).toFixed(1)}" y1="${y + 7}" y2="${y + 7}" stroke="var(--bone)" stroke-width="1.5"/>`;
+    for (const v of s.values) svg += `<circle cx="${x(v).toFixed(1)}" cy="${y + 7}" r="2.4" fill="var(--void)" stroke="var(--bone)" stroke-width="1"/>`;
+    svg += `<text x="${R + 8}" y="${y + 11}" font-size="11">${ftNum(s.mean, m.key)}</text>`;
+  });
+  if (base !== undefined) svg += `<line x1="${x(base).toFixed(1)}" x2="${x(base).toFixed(1)}" y1="2" y2="${conds.length * rowH + 2}" stroke="var(--bone)" stroke-dasharray="3 3" opacity=".5"/>`;
+  svg += '</svg>';
+  const dl = (key, label) => {
+    const d = S.paired[key]?.[m.key]; if (!d) return '';
+    const sign = (v) => (v >= 0 ? '+' : '−') + (m.key.endsWith('rate') ? (100 * Math.abs(v)).toFixed(1) + ' pts' : Math.abs(v).toFixed(3));
+    const verdict = d.excludes_zero ? ` <span class="${d.favours_cleaned ? 'sig' : 'bad'}">${d.favours_cleaned ? 'better' : 'worse'}</span>` : '';
+    return `<div>cleaned − ${label}: <b>${sign(d.mean_diff)}</b> [${sign(d.ci95[0])}, ${sign(d.ci95[1])}]${verdict}</div>`;
+  };
+  const hint = m.better > 0 ? 'higher is better' : 'lower is better';
+  return `<div class="ft-card"><h4>${esc(m.label)}<span class="hint">${hint}</span></h4>${svg}<div class="delta">${dl('cleaned_minus_raw', 'raw')}${dl('cleaned_minus_random', 'random')}</div></div>`;
+}
+function ftCurves(S) {
+  const conds = ['raw', 'cleaned', 'random'].filter((c) => S.conditions[c]?.curve), W = 640, H = 200, pad = 34;
+  const all = conds.flatMap((c) => S.conditions[c].curve), lo = Math.min(...all), hi = Math.max(...all);
+  const n = Math.max(...conds.map((c) => S.conditions[c].curve.length));
+  const X = (i) => pad + (W - pad - 8) * (i / Math.max(1, n - 1)), Y = (v) => 10 + (H - 30) * (1 - (v - lo) / Math.max(1e-9, hi - lo));
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Training loss curves">`;
+  for (let k = 0; k <= 3; k++) { const v = lo + ((hi - lo) * k) / 3; svg += `<line x1="${pad}" x2="${W - 8}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="var(--line)"/><text x="2" y="${(Y(v) + 3).toFixed(1)}">${v.toFixed(2)}</text>`; }
+  svg += `<text x="${pad}" y="${H - 4}">step 10</text><text x="${W - 40}" y="${H - 4}">step ${n * 10}</text>`;
+  for (const c of conds) svg += `<polyline fill="none" stroke="${FT_COLORS[c]}" stroke-width="1.8" points="${S.conditions[c].curve.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ')}"/>`;
+  return svg + '</svg>';
+}
+async function loadFinetune() {
+  try {
+    const res = await fetch('data/finetune.json'); if (!res.ok) throw new Error(res.status);
+    const S = await res.json(), c = S.config, d = S.data;
+    $('#ft-lede').textContent = `I fine-tuned ${c.model.split('/')[1]} for ${c.steps} optimiser steps (batch ${c.batch_size}, learning rate ${c.lr.toExponential(0)}) on three training sets built from the synthetic-contamination slice: the raw slice (${fmt(d.raw_rows)} rows), the same slice after SFT Forge (${fmt(d.cleaned_rows)} rows), and a random subsample of the raw slice with as many rows as the cleaned set. Each was trained with ${c.seeds.length} seeds and scored on ${d.heldout_rows} clean, held-out Dolly rows. Bars are the mean over seeds with ±1 standard deviation, the dots are the individual seeds, and the dashed line is the untuned model. Trained on ${S.device}.`;
+    $('#ft-legend').innerHTML = ['raw', 'cleaned', 'random'].map((k) => `<span><i style="background:${FT_COLORS[k]}"></i>${FT_NAMES[k]}</span>`).join('') + '<span>- - untuned model</span>';
+    $('#ft-grid').innerHTML = S.metrics.map((m) => ftCard(m, S)).join('');
+    $('#ft-curves').innerHTML = ftCurves(S);
+    $('#ft-note').textContent = 'Differences are paired by seed, with a 95% t-interval over the seeds; "better" or "worse" appears only when that interval excludes zero. With few seeds the intervals are wide, so the absence of a label is not evidence of no effect. The defects were injected by me, so this shows what these defects teach a small model, not what real web data does.';
+    $('#finetune').hidden = false;
+  } catch { /* the section stays hidden when the results file is missing */ }
+}
+
 /* ---------------------------------------------------------------- theme and boot */
 function applyTheme(t) { document.documentElement.dataset.theme = t; $('meta[name=theme-color]').content = t === 'light' ? '#f4f3ee' : '#07080a'; readPalette(); }
 $('#theme').addEventListener('click', () => { const t = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'; store.set('forge-theme', t); applyTheme(t); });
@@ -662,4 +715,5 @@ layout();
 requestAnimationFrame(frame);
 probeLive();
 loadRecorded(new URLSearchParams(location.search).get('run') === 'bench' ? 'bench' : 'dolly');
+loadFinetune();
 window.__forge = { sim, app };

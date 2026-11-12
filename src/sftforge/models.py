@@ -115,7 +115,7 @@ class ToxicBert:
 
 
 class SmolPerplexity:
-    """Perplexity of a text under SmolLM2-135M (float32 on the chosen device)."""
+    """Perplexity of a text under SmolLM2-135M-Instruct (float32 on the chosen device)."""
 
     def __init__(self, name: str, revision: str | None = None, max_tokens: int = 128, device: str = "cpu"):
         import torch
@@ -192,6 +192,11 @@ class CachedToxicity(_Cached):
         return self._run(texts, self.inner.score)
 
 
+class CachedPerplexity(_Cached):
+    def score(self, texts: list[str]) -> list[float]:
+        return self._run(texts, self.inner.score)
+
+
 class Models:
     """Builds real models on first use; tests pass stubs instead. cache_dir enables on-disk result caching."""
 
@@ -248,5 +253,8 @@ class Models:
     @property
     def perplexity(self) -> PerplexityScorer:
         if self._ppl is None:
-            self._ppl = SmolPerplexity(self.cfg.perplexity, self.cfg.perplexity_revision, device=self.device)
+            ppl: PerplexityScorer = SmolPerplexity(self.cfg.perplexity, self.cfg.perplexity_revision, device=self.device)
+            if self.cache_dir:
+                ppl = CachedPerplexity(ppl, DiskCache(self.cache_dir / "perplexity.pkl"), f"{self.cfg.perplexity}@{self.device}")
+            self._ppl = ppl
         return self._ppl

@@ -38,7 +38,7 @@ Datasets
 Models (all CPU-friendly)
 - sentence-transformers/all-MiniLM-L6-v2: apache-2.0, 22.7M params. Near-dup and instruction-response relevance.
 - unitary/toxic-bert: apache-2.0, 109M params. Multi-label toxicity classifier.
-- HuggingFaceTB/SmolLM2-135M: apache-2.0, 135M params. Optional perplexity signal (off by default).
+- HuggingFaceTB/SmolLM2-135M-Instruct: apache-2.0, 135M params. Optional perplexity signal (off by default) and the model in the fine-tuning comparison.
 - Rejected on licence: s-nlp/roberta_toxicity_classifier (openrail++), KoalaAI/Text-Moderation (openrail), facebook fasttext lid (cc-by-nc-4.0).
 - Language id: `lingua-language-detector` (Apache-2.0, models bundled, no download), restricted to a language subset for memory. Fallback: `papluca/xlm-roberta-base-language-detection` (MIT, 278M), heavier.
 
@@ -59,5 +59,5 @@ Dolly is already human-curated, so reject rates will be modest (single digit to 
 - Dolly-15k: https://huggingface.co/datasets/databricks/databricks-dolly-15k
 - oasst1: https://huggingface.co/datasets/OpenAssistant/oasst1
 - unitary/toxic-bert: https://huggingface.co/unitary/toxic-bert
-- SmolLM2-135M: https://huggingface.co/HuggingFaceTB/SmolLM2-135M
+- SmolLM2-135M-Instruct: https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct
 - all-MiniLM-L6-v2: https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2

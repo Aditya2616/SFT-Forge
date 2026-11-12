@@ -51,6 +51,11 @@ def main() -> None:
                 page.locator("#logsp .row").first.click()
             page.wait_for_timeout(700)
             page.screenshot(path=str(out / f"{name}-inspector.png"))
+            if args.final:  # the downstream experiment view
+                page.click("#i-close")
+                page.evaluate("document.querySelector('#finetune').scrollIntoView({block: 'start'})")
+                page.wait_for_timeout(500)
+                page.screenshot(path=str(out / f"{name}-finetune.png"), full_page=False)
             small = page.evaluate(
                 "[...document.querySelectorAll('button, a, select, input, label.btn')].filter(e => e.offsetParent && "
                 "(e.getBoundingClientRect().height < 43.5) && !e.classList.contains('sr')).map(e => e.id || e.textContent.trim().slice(0,20))")
@@ -64,7 +69,7 @@ def main() -> None:
 
         dst = ROOT / "docs" / "assets"
         dst.mkdir(parents=True, exist_ok=True)
-        for n in ("desktop-streaming", "phone-streaming", "desktop-inspector", "phone-inspector"):
+        for n in ("desktop-streaming", "phone-streaming", "desktop-inspector", "phone-inspector", "desktop-finetune", "phone-finetune"):
             shutil.copy(out / f"{n}.png", dst / f"{n}.png")
 
 

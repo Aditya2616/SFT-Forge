@@ -1,0 +1,208 @@
+{
+  "rule": {
+    "min_gain_pp": 5.0,
+    "max_extra_false_pp": 0.1,
+    "targets": [
+      "truncated",
+      "off_topic"
+    ],
+    "grid": [
+      150,
+      250,
+      400,
+      600,
+      1000,
+      1500,
+      2500
+    ]
+  },
+  "chosen_max_ppl": null,
+  "enable_by_default": false,
+  "dev": {
+    "n_rows": 3180,
+    "settings": {
+      "off": {
+        "max_ppl": null,
+        "target_recall": 0.6333,
+        "target_caught": 76,
+        "target_n": 120,
+        "false_reject_rate": 0.0175,
+        "false_rejects": 45,
+        "untouched_n": 2565,
+        "rows_kept": 2528,
+        "high_perplexity_rejects": 0,
+        "high_perplexity_on_injected": 0,
+        "overall_injected_recall": 0.8748,
+        "device": "cuda (NVIDIA GeForce RTX 5060 Ti), float32"
+      },
+      "150": {
+        "max_ppl": 150,
+        "target_recall": 0.6417,
+        "target_caught": 77,
+        "target_n": 120,
+        "false_reject_rate": 0.1583,
+        "false_rejects": 406,
+        "untouched_n": 2565,
+        "rows_kept": 2207,
+        "high_perplexity_rejects": 368,
+        "high_perplexity_on_injected": 6,
+        "overall_injected_recall": 0.8732,
+        "device": "cuda (NVIDIA GeForce RTX 5060 Ti), float32",
+        "gain_pp": 0.84,
+        "extra_false_pp": 14.08
+      },
+      "250": {
+        "max_ppl": 250,
+        "target_recall": 0.6417,
+        "target_caught": 77,
+        "target_n": 120,
+        "false_reject_rate": 0.1279,
+        "false_rejects": 328,
+        "untouched_n": 2565,
+        "rows_kept": 2287,
+        "high_perplexity_rejects": 286,
+        "high_perplexity_on_injected": 2,
+        "overall_injected_recall": 0.8748,
+        "device": "cuda (NVIDIA GeForce RTX 5060 Ti), float32",
+        "gain_pp": 0.84,
+        "extra_false_pp": 11.04
+      },
+      "400": {
+        "max_ppl": 400,
+        "target_recall": 0.6333,
+        "target_caught": 76,
+        "target_n": 120,
+        "false_reject_rate": 0.1107,
+        "false_rejects": 284,
+        "untouched_n": 2565,
+        "rows_kept": 2335,
+        "high_perplexity_rejects": 241,
+        "high_perplexity_on_injected": 1,
+        "overall_injected_recall": 0.8732,
+        "device": "cuda (NVIDIA GeForce RTX 5060 Ti), float32",
+        "gain_pp": 0.0,
+        "extra_false_pp": 9.32
+      },
+      "600": {
+        "max_ppl": 600,
+        "target_recall": 0.6333,
+        "target_caught": 76,
+        "target_n": 120,
+        "false_reject_rate": 0.0932,
+        "false_rejects": 239,
+        "untouched_n": 2565,
+        "rows_kept": 2375,
+        "high_perplexity_rejects": 196,
+        "high_perplexity_on_injected": 1,
+        "overall_injected_recall": 0.8732,
+        "device": "cuda (NVIDIA GeForce RTX 5060 Ti), float32",
+        "gain_pp": 0.0,
+        "extra_false_pp": 7.57
+      },
+      "1000": {
+        "max_ppl": 1000,
+        "target_recall": 0.6333,
+        "target_caught": 76,
+        "target_n": 120,
+        "false_reject_rate": 0.0799,
+        "false_rejects": 205,
+        "untouched_n": 2565,
+        "rows_kept": 2403,
+        "high_perplexity_rejects": 161,
+        "high_perplexity_on_injected": 0,
+        "overall_injected_recall": 0.8748,
+        "device": "cuda (NVIDIA GeForce RTX 5060 Ti), float32",
+        "gain_pp": 0.0,
+        "extra_false_pp": 6.24
+      },
+      "1500": {
+        "max_ppl": 1500,
+        "target_recall": 0.6333,
+        "target_caught": 76,
+        "target_n": 120,
+        "false_reject_rate": 0.069,
+        "false_rejects": 177,
+        "untouched_n": 2565,
+        "rows_kept": 2430,
+        "high_perplexity_rejects": 133,
+        "high_perplexity_on_injected": 0,
+        "overall_injected_recall": 0.8748,
+        "device": "cuda (NVIDIA GeForce RTX 5060 Ti), float32",
+        "gain_pp": 0.0,
+        "extra_false_pp": 5.15
+      },
+      "2500": {
+        "max_ppl": 2500,
+        "target_recall": 0.6333,
+        "target_caught": 76,
+        "target_n": 120,
+        "false_reject_rate": 0.0589,
+        "false_rejects": 151,
+        "untouched_n": 2565,
+        "rows_kept": 2451,
+        "high_perplexity_rejects": 107,
+        "high_perplexity_on_injected": 0,
+        "overall_injected_recall": 0.8748,
+        "device": "cuda (NVIDIA GeForce RTX 5060 Ti), float32",
+        "gain_pp": 0.0,
+        "extra_false_pp": 4.14
+      }
+    },
+    "auc_vs_untouched": {
+      "truncated": 0.399,
+      "off_topic": 0.428
+    },
+    "untouched_flagged_at_loosest": {
+      "max_ppl": 2500,
+      "n": 107,
+      "median_words": 2,
+      "median_words_not_flagged": 32.0
+    }
+  },
+  "bench": {
+    "n_rows": 3180,
+    "settings": {
+      "off": {
+        "max_ppl": null,
+        "target_recall": 0.6333,
+        "target_caught": 76,
+        "target_n": 120,
+        "false_reject_rate": 0.0164,
+        "false_rejects": 42,
+        "untouched_n": 2565,
+        "rows_kept": 2521,
+        "high_perplexity_rejects": 0,
+        "high_perplexity_on_injected": 0,
+        "overall_injected_recall": 0.8829,
+        "device": "cuda (NVIDIA GeForce RTX 5060 Ti), float32"
+      },
+      "2500": {
+        "max_ppl": 2500,
+        "target_recall": 0.6333,
+        "target_caught": 76,
+        "target_n": 120,
+        "false_reject_rate": 0.0546,
+        "false_rejects": 140,
+        "untouched_n": 2565,
+        "rows_kept": 2453,
+        "high_perplexity_rejects": 98,
+        "high_perplexity_on_injected": 0,
+        "overall_injected_recall": 0.8829,
+        "device": "cuda (NVIDIA GeForce RTX 5060 Ti), float32",
+        "gain_pp": 0.0,
+        "extra_false_pp": 3.82
+      }
+    },
+    "auc_vs_untouched": {
+      "truncated": 0.423,
+      "off_topic": 0.415
+    },
+    "untouched_flagged_at_loosest": {
+      "max_ppl": 2500,
+      "n": 97,
+      "median_words": 2,
+      "median_words_not_flagged": 30.0
+    }
+  },
+  "model": "HuggingFaceTB/SmolLM2-135M-Instruct"
+}

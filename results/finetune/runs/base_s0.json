@@ -1,0 +1,26 @@
+{
+ "condition": "base",
+ "seed": 0,
+ "device": "cuda (NVIDIA GeForce RTX 5060 Ti), float32",
+ "train_rows": 0,
+ "injected_rows": 0,
+ "metrics": {
+  "refusal_rate": 0.006666666666666667,
+  "cut_rate": 0.0,
+  "foreign_rate": 0.0,
+  "pii_rate": 0.0,
+  "verbatim_rate": 0.0,
+  "rouge_l": 0.18383470149681733,
+  "empty_rate": 0.0,
+  "stopped_rate": 0.37333333333333335,
+  "mean_words": 96.43,
+  "loss": 2.419278649964422,
+  "perplexity": 11.2377500390298,
+  "embed_sim": 0.6502857208251953
+ },
+ "curve_every_10_steps": [],
+ "train_seconds": 0.0,
+ "eval_seconds": 60.3,
+ "peak_vram_gib": 0.53,
+ "peak_vram_allocated_gib": 0.51
+}

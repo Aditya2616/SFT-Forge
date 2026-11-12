@@ -138,7 +138,7 @@ def run(df: pd.DataFrame, cfg: Config, ctx: Context) -> None:
             check(df, i, GATE, "perplexity", rnd(p, 1), f"<= {q.perplexity.max_ppl}", ok)
             df.at[i, "scores"]["ppl"] = rnd(p, 1)
             if not ok:
-                fail(df, i, GATE, "high_perplexity", f"response perplexity {p:.0f} under SmolLM2-135M", rnd(p, 1),
+                fail(df, i, GATE, "high_perplexity", f"response perplexity {p:.0f} under SmolLM2-135M-Instruct", rnd(p, 1),
                      q.perplexity.max_ppl)
 
     # combined 0-1 score (display and balancing tie-break only; verdicts come from the rules above)

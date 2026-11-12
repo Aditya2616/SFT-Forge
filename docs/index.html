@@ -91,6 +91,16 @@
     </div>
   </section>
 
+  <section id="finetune" hidden>
+    <div class="label">Downstream check</div>
+    <h2>Does cleaning <em>help</em> a model?</h2>
+    <p class="lede" id="ft-lede"></p>
+    <div class="legend" id="ft-legend"></div>
+    <div class="ft-grid" id="ft-grid"></div>
+    <div class="card" style="margin-top:14px"><div class="label">Training loss (mean of the seeds, every 10 steps)</div><div id="ft-curves"></div></div>
+    <p class="note" id="ft-note"></p>
+  </section>
+
   <section id="audit">
     <div class="label">Audit report</div>
     <h2>What each gate <em>did</em>.</h2>
