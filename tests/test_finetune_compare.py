@@ -54,3 +54,11 @@ def test_summary_pairs_runs_by_seed_and_reports_intervals(tmp_path, monkeypatch)
     flat = s["paired"]["cleaned_minus_raw"]["rouge_l"]
     assert flat["mean_diff"] == 0 and flat["favours_cleaned"] is None
     assert s["conditions"]["raw"]["metrics"]["loss"]["sd"] > 0
+
+
+def test_roc_auc_helper_in_perplexity_script():
+    import eval_perplexity as ep
+
+    assert ep.roc_auc([1, 1, 0, 0], [0.9, 0.8, 0.2, 0.1]) == 1.0
+    assert ep.roc_auc([1, 1, 0, 0], [0.1, 0.2, 0.8, 0.9]) == 0.0
+    assert ep.roc_auc([1, 0, 1, 0], [0.5, 0.5, 0.5, 0.5]) == 0.5

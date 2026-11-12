@@ -11,8 +11,6 @@ from __future__ import annotations
 import argparse
 import json
 
-from sklearn.metrics import roc_auc_score
-
 from common import ROOT
 from eval_benchmark import evaluate
 from sftforge import pipeline
@@ -24,6 +22,23 @@ GRID = [150, 250, 400, 600, 1000, 1500, 2500]
 TARGETS = ("truncated", "off_topic")
 MIN_GAIN_PP = 5.0
 MAX_FALSE_PP = 0.1
+
+
+def roc_auc(labels: list[int], scores: list[float]) -> float:
+    """Probability that a random positive scores higher than a random negative (ties count half)."""
+    order = sorted(range(len(scores)), key=lambda i: scores[i])
+    ranks = [0.0] * len(scores)
+    i = 0
+    while i < len(order):
+        j = i
+        while j + 1 < len(order) and scores[order[j + 1]] == scores[order[i]]:
+            j += 1
+        for k in range(i, j + 1):
+            ranks[order[k]] = (i + j) / 2 + 1
+        i = j + 1
+    pos = [r for r, y in zip(ranks, labels, strict=True) if y == 1]
+    n_pos, n_neg = len(pos), len(labels) - len(pos)
+    return (sum(pos) - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg)
 
 
 def run_slice(name: str, device: str | None, thresholds: list[int | None], models_cache) -> dict:
@@ -71,7 +86,7 @@ def run_slice(name: str, device: str | None, thresholds: list[int | None], model
             elif dfn is None:
                 y.append(0)
                 s.append(sc)
-        auc[d] = round(float(roc_auc_score(y, s)), 3)
+        auc[d] = round(roc_auc(y, s), 3)
     out["auc_vs_untouched"] = auc
     # which untouched rows does the loosest threshold flag? (the score is the response alone, so short answers suffer)
     import statistics
