@@ -111,3 +111,8 @@ def test_proper_nouns_do_not_decide_language():
 def test_truncation_uses_last_word_even_after_numbers():
     assert text_rules.truncation_signal("He stepped down as chairman of the company in 2016") is None
     assert text_rules.truncation_signal("He stepped down as chairman of the company in") == "ends_on_function_word"
+
+
+def test_closing_rule_is_not_a_truncation():
+    text = "Key file:" + chr(10) + "-----BEGIN KEY-----" + chr(10) + "abc" + chr(10) + "-----END KEY-----"
+    assert text_rules.truncation_signal(text) is None

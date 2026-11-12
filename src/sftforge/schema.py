@@ -94,7 +94,7 @@ class PiiCfg(_Cfg):
 class ToxicityCfg(_Cfg):
     enabled: bool = True
     labels: list[str] = ["toxic", "severe_toxic", "threat", "identity_hate"]
-    threshold: float = 0.90
+    threshold: float = 0.50
     max_tokens: int = 128
     chunk_chars: int = 500
     max_chunks: int = 5
@@ -112,6 +112,7 @@ class BalanceCfg(_Cfg):
     enabled: bool = True
     max_share: float = 0.20
     val_fraction: float = 0.05
+    min_rows: int = 100
 
 
 class ExportCfg(_Cfg):

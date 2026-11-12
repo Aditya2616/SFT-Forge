@@ -150,7 +150,7 @@ def test_balance_and_split_deterministic(cfg, models):
     topics = ["rivers", "mountains", "cooking", "music", "football", "chess", "gardening", "planets", "bridges", "trains"]
     rows = [row(f"Tell me something about {topics[i % 10]} number {i}", f"Here is a fact about {topics[i % 10]} with detail {i} and more words to read",
                 cat=c, rid=f"r{i}") for i, c in enumerate(cats)]
-    cfg2 = cfg.model_copy(update={"balance": BalanceCfg(max_share=0.4, val_fraction=0.1)})
+    cfg2 = cfg.model_copy(update={"balance": BalanceCfg(max_share=0.4, val_fraction=0.1, min_rows=0)})
     a = run(rows, cfg2, models)
     b = run(rows, cfg2, models)
     kept = a.df[a.df["status"] == "kept"]
@@ -190,3 +190,8 @@ def test_chunking_covers_long_text_and_toxicity_in_the_tail(good_rows, cfg, mode
     res = run(good_rows + [row("Tell me about the history of rivers", long_resp, rid="tail")], cfg, models)
     r = by_id(res, "tail")
     assert any(x["c"] == "toxicity" for x in r["reasons"]) or r["status"] == "rejected"
+
+
+def test_small_inputs_are_not_capped(good_rows, models):
+    res = pipeline.run(make_df(good_rows), Config(balance=BalanceCfg(max_share=0.2, val_fraction=0)), models)
+    assert (res.df["status"] == "kept").all()

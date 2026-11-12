@@ -35,7 +35,7 @@ def run(df: pd.DataFrame, cfg: BalanceCfg, seed: int) -> dict[str, object]:
         by_cat.setdefault(df.at[i, "category"], []).append(i)
     # with k categories no set can have every share below 1/k, so the target never goes under 1/k + 5 points
     share = max(cfg.max_share, 1 / max(len(by_cat), 1) + 0.05)
-    cap = category_cap({k: len(v) for k, v in by_cat.items()}, share) if cfg.enabled and len(by_cat) > 1 else None
+    cap = category_cap({k: len(v) for k, v in by_cat.items()}, share) if cfg.enabled and len(by_cat) > 1 and len(idx) >= cfg.min_rows else None
     info["cap"], info["max_share"] = cap, round(share, 3)
     for cat, members in by_cat.items():
         members_sorted = sorted(members, key=lambda i: (-(df.at[i, "scores"].get("q") or 0.0), i))

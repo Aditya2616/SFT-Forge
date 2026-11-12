@@ -71,6 +71,8 @@ def truncation_signal(text: str, unpunctuated_min_words: int = 0) -> str | None:
     if t.count('"') % 2 == 1 and len(t) > 60 and t[-1] not in '."!?':
         return "unbalanced_quote"
     last = t[-1]
+    if t.endswith(("---", "===")):
+        return None  # a closing rule such as the end of a PEM block, not a cut-off
     if last in ",;:-–—/(":
         return "ends_with_connector_punctuation"
     if last in ".!?\"')]}”’*`>%" or not (last.isalnum()):

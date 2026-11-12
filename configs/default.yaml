@@ -39,7 +39,7 @@ quality:
   language:
     enabled: true
     allowed: [ENGLISH]
-    min_chars: 60              # letters needed before language is judged (short texts and names mislead)
+    min_chars: 40              # letters left after dropping proper nouns before language is judged
     max_other_confidence: 0.80 # reject when a non-allowed language has at least this confidence ...
     max_allowed_confidence: 0.20  # ... and the allowed languages together stay below this
   relevance:
@@ -58,8 +58,10 @@ safety:
   toxicity:
     enabled: true
     labels: [toxic, severe_toxic, threat, identity_hate]
-    threshold: 0.90
+    threshold: 0.50
     max_tokens: 128
+    chunk_chars: 500           # long texts are scored in chunks; the worst chunk counts
+    max_chunks: 5
     allow_categories: [classification]   # tasks that legitimately quote toxic text
   unsafe_rules: true
 
@@ -67,6 +69,7 @@ balance:
   enabled: true
   max_share: 0.20              # no category may exceed this share of the final set
   val_fraction: 0.05
+  min_rows: 100                # below this many survivors the cap is skipped (small inputs are not trimmed)
 
 export:
   chat_template: chatml        # chatml, or a Hugging Face tokenizer id
