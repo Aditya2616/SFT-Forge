@@ -75,7 +75,7 @@ def truncation_signal(text: str, unpunctuated_min_words: int = 0) -> str | None:
         return "ends_with_connector_punctuation"
     if last in ".!?\"')]}”’*`>%" or not (last.isalnum()):
         return None
-    words = re.findall(r"[A-Za-z']+", t)
+    words = re.findall(r"[\w']+", t)
     if len(words) >= 8 and words[-1].lower() in _DANGLING:
         return "ends_on_function_word"
     if unpunctuated_min_words and len(t.split()) >= unpunctuated_min_words and "\n" not in t[-80:]:

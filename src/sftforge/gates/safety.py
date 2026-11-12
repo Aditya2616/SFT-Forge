@@ -11,6 +11,40 @@ GATE = "safety"
 FIELDS = ("instruction", "context", "response")
 
 
+def chunk_text(text: str, size: int, limit: int) -> list[str]:
+    """Split on whitespace into chunks of about `size` characters; at most `limit` chunks, always at least one."""
+    chunks: list[str] = []
+    cur = ""
+    for word in text.split():
+        if cur and len(cur) + 1 + len(word) > size:
+            chunks.append(cur)
+            cur = word
+            if len(chunks) >= limit:
+                return chunks
+        else:
+            cur = f"{cur} {word}" if cur else word
+    if cur and len(chunks) < limit:
+        chunks.append(cur)
+    return chunks or [""]
+
+
+def _score_chunked(scorer, texts: list[str], size: int, limit: int) -> list[dict[str, float]]:
+    """Per text: the highest score per label over all of its chunks."""
+    chunks, owner = [], []
+    for k, t in enumerate(texts):
+        for c in chunk_text(t, size, limit):
+            chunks.append(c)
+            owner.append(k)
+    scored = scorer.score(chunks)
+    out: list[dict[str, float]] = [{} for _ in texts]
+    for k, sc in zip(owner, scored, strict=True):
+        cur = out[k]
+        for lab, v in sc.items():
+            if v > cur.get(lab, -1.0):
+                cur[lab] = v
+    return out
+
+
 def run(df: pd.DataFrame, cfg: Config, ctx: Context) -> None:
     s = cfg.safety
 
@@ -59,9 +93,9 @@ def run(df: pd.DataFrame, cfg: Config, ctx: Context) -> None:
         idx = alive_idx(df)
         if idx:
             scorer = ctx.models.toxicity
-            ins_scores = scorer.score([df.at[i, "instruction"] for i in idx])
+            ins_scores = _score_chunked(scorer, [df.at[i, "instruction"] for i in idx], t.chunk_chars, t.max_chunks)
             ctx.progress("safety", 0.7)
-            res_scores = scorer.score([df.at[i, "response"] for i in idx])
+            res_scores = _score_chunked(scorer, [df.at[i, "response"] for i in idx], t.chunk_chars, t.max_chunks)
             for i, a, b in zip(idx, ins_scores, res_scores, strict=True):
                 worst_label, worst = max(
                     ((f"{where}:{lab}", v[lab]) for where, v in (("instruction", a), ("response", b))

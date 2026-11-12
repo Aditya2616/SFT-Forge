@@ -99,3 +99,15 @@ def test_language_confidences():
     en = language.language_confidences("The quick brown fox jumps over the lazy dog near the river bank today.")
     es = language.language_confidences("El rápido zorro marrón salta sobre el perro perezoso cerca del río hoy mismo.")
     assert en["ENGLISH"] > 0.5 and es["SPANISH"] > 0.8
+
+
+def test_proper_nouns_do_not_decide_language():
+    text = "How many canals are in Amsterdam, including Singel Herengracht Keizersgracht Prinsengracht and many more?"
+    stripped = language.strip_proper_nouns(text)
+    assert "Singel" not in stripped and stripped.startswith("How many canals are in")
+    assert "Amsterdam," not in stripped
+
+
+def test_truncation_uses_last_word_even_after_numbers():
+    assert text_rules.truncation_signal("He stepped down as chairman of the company in 2016") is None
+    assert text_rules.truncation_signal("He stepped down as chairman of the company in") == "ends_on_function_word"

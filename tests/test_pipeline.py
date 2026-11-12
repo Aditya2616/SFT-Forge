@@ -178,3 +178,15 @@ def test_export_files_and_schema(tmp_path: Path, good_rows, cfg, models):
     from datasets import load_from_disk
 
     assert len(load_from_disk(str(files["hf_dataset"]))["train"]) == len(good_rows)
+
+
+def test_chunking_covers_long_text_and_toxicity_in_the_tail(good_rows, cfg, models):
+    from sftforge.gates.safety import chunk_text
+
+    chunks = chunk_text("word " * 400, 500, 5)
+    assert 1 < len(chunks) <= 5 and all(len(c) <= 500 for c in chunks)
+    assert chunk_text("", 500, 5) == [""]
+    long_resp = "The history of rivers is long and interesting. " * 30 + "You are an idiot."
+    res = run(good_rows + [row("Tell me about the history of rivers", long_resp, rid="tail")], cfg, models)
+    r = by_id(res, "tail")
+    assert any(x["c"] == "toxicity" for x in r["reasons"]) or r["status"] == "rejected"

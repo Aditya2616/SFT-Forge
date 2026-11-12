@@ -56,7 +56,7 @@ class TruncationCfg(_Cfg):
 class LanguageCfg(_Cfg):
     enabled: bool = True
     allowed: list[str] = ["ENGLISH"]
-    min_chars: int = 60
+    min_chars: int = 40
     max_other_confidence: float = 0.80
     max_allowed_confidence: float = 0.20
 
@@ -96,6 +96,8 @@ class ToxicityCfg(_Cfg):
     labels: list[str] = ["toxic", "severe_toxic", "threat", "identity_hate"]
     threshold: float = 0.90
     max_tokens: int = 128
+    chunk_chars: int = 500
+    max_chunks: int = 5
     allow_categories: list[str] = ["classification"]
 
 

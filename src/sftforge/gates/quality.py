@@ -86,7 +86,7 @@ def run(df: pd.DataFrame, cfg: Config, ctx: Context) -> None:
     if q.language.enabled:
         allowed = {a.upper() for a in q.language.allowed}
         for i in alive_idx(df):
-            text = (df.at[i, "instruction"] + " " + df.at[i, "response"])[:700]
+            text = language.strip_proper_nouns((df.at[i, "instruction"] + " " + df.at[i, "response"])[:900])[:700]
             letters = sum(c.isalpha() for c in text)
             if letters < q.language.min_chars:
                 check(df, i, GATE, "language", None, f"other <= {q.language.max_other_confidence}", True,
@@ -97,7 +97,7 @@ def run(df: pd.DataFrame, cfg: Config, ctx: Context) -> None:
             mine = sum(v for k, v in conf.items() if k in allowed)
             ok = not (other >= q.language.max_other_confidence and mine < q.language.max_allowed_confidence)
             check(df, i, GATE, "language", f"{other_lang.title()} {other:.2f}",
-                  f"other < {q.language.max_other_confidence} or allowed >= {q.language.max_allowed_confidence}", ok)
+                  f"< {q.language.max_other_confidence} (unless allowed >= {q.language.max_allowed_confidence})", ok)
             if not ok:
                 fail(df, i, GATE, "wrong_language", f"text reads as {other_lang.title()} ({other:.2f})",
                      rnd(other, 2), q.language.max_other_confidence)

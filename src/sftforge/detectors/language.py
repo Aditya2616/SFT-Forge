@@ -18,6 +18,18 @@ def _detector():
     return LanguageDetectorBuilder.from_languages(*langs).with_preloaded_language_models().build()
 
 
+def strip_proper_nouns(text: str) -> str:
+    """Drop capitalised words that do not start a sentence, so lists of names do not decide the language."""
+    out: list[str] = []
+    start = True
+    for tok in text.split():
+        first = next((c for c in tok if c.isalpha()), "")
+        if not (first.isupper() and not start):
+            out.append(tok)
+        start = tok.endswith((".", "!", "?", ":"))
+    return " ".join(out)
+
+
 def language_confidences(text: str) -> dict[str, float]:
     """Map language name -> confidence in [0, 1] (sums to 1 over the subset)."""
     vals = _detector().compute_language_confidence_values(text)

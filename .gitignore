@@ -12,3 +12,4 @@ models/
 .cache/
 .tmp*
 results/untouched_rejects_*.json
+.shots/
