@@ -1,0 +1,73 @@
+# Every threshold the pipeline uses lives in this file.
+seed: 42
+
+models:
+  embedder: sentence-transformers/all-MiniLM-L6-v2
+  embedder_revision: 1110a243fdf4706b3f48f1d95db1a4f5529b4d41
+  toxicity: unitary/toxic-bert
+  toxicity_revision: 4d6c22e74ba2fdd26bc4f7238f50766b045a0d94
+  perplexity: HuggingFaceTB/SmolLM2-135M
+  perplexity_revision: 93efa2f097d58c2a74874c7e644dbc9b0cee75a2
+
+normalize:
+  strip_citations: true        # removes Wikipedia-style [12] markers from context and response
+
+dedupe:
+  exact: true
+  near:
+    enabled: true
+    threshold: 0.80            # Jaccard on word shingles (MinHash + LSH)
+    shingle_words: 5
+    num_perm: 128
+  semantic:
+    enabled: true
+    threshold: 0.95            # cosine of the instruction+response embedding, same category only
+
+quality:
+  min_instruction_chars: 5
+  min_response_chars: 2
+  max_response_chars: 20000
+  max_length_ratio: 400        # response words / instruction words
+  min_alnum_ratio: 0.40        # alphanumeric share of non-space characters
+  repetition:
+    min_words: 30
+    max_repeated_trigram_share: 0.50
+  truncation:
+    enabled: true
+    unpunctuated_min_words: 0  # 0 = off. Humans often skip the final period, so this is off by default
+  refusal_boilerplate: true
+  language:
+    enabled: true
+    allowed: [ENGLISH]
+    min_chars: 60              # letters needed before language is judged (short texts and names mislead)
+    max_other_confidence: 0.80 # reject when a non-allowed language has at least this confidence ...
+    max_allowed_confidence: 0.20  # ... and the allowed languages together stay below this
+  relevance:
+    enabled: true
+    min_cosine: 0.10           # max(cos(instruction, response), cos(context, response))
+    min_response_words: 8      # very short answers ("Yes", a name) are not judged on relevance
+  perplexity:
+    enabled: false             # SmolLM2-135M mean token loss on the response; slow on CPU
+    max_ppl: 2500
+
+safety:
+  pii:
+    action: redact             # redact | reject
+    types: [email, phone, card, ssn, ipv4, iban]
+  secrets: true
+  toxicity:
+    enabled: true
+    labels: [toxic, severe_toxic, threat, identity_hate]
+    threshold: 0.90
+    max_tokens: 128
+    allow_categories: [classification]   # tasks that legitimately quote toxic text
+  unsafe_rules: true
+
+balance:
+  enabled: true
+  max_share: 0.20              # no category may exceed this share of the final set
+  val_fraction: 0.05
+
+export:
+  chat_template: chatml        # chatml, or a Hugging Face tokenizer id
+  hf_dataset: true
