@@ -6,3 +6,8 @@ Changes: filtered, de-duplicated, PII-redacted and category-balanced by SFT Forg
 apart from whitespace and citation-marker normalisation.
 
 This folder is separate from the MIT-licensed code in the rest of the repository.
+
+Rows naming specific AI products (a case-insensitive deny-list: see DENY in src/sftforge/runjson.py) are left
+out of the published files. Rows left out of this sample: 3. Rows whose text is left out of the recorded
+demo runs in docs/data/dolly/: 12 (they still appear in the stream and the statistics, without text).
+The audit counts of the real runs are unchanged.

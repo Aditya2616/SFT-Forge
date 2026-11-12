@@ -107,9 +107,10 @@ def test_cli_run_writes_outputs(tmp_path, monkeypatch):
 
     monkeypatch.setattr(pipeline, "run", stubbed)
     out = tmp_path / "out"
-    assert cli.main(["run", str(src), "--out", str(out), "--run-json", str(tmp_path / "run.json")]) == 0
+    assert cli.main(["run", str(src), "--out", str(out), "--recorded-dir", str(tmp_path / "rec")]) == 0
     assert (out / "audit.json").exists() and (out / "train.jsonl").exists()
-    assert json.loads((tmp_path / "run.json").read_text(encoding="utf-8"))["meta"]["label"] == "Recorded run"
+    index = json.loads((tmp_path / "rec" / "index.json").read_text(encoding="utf-8"))
+    assert index["meta"]["label"] == "Recorded run" and (tmp_path / "rec" / "c0.json").exists()
 
 
 def test_served_index_announces_the_backend(client):

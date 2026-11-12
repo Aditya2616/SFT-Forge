@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -28,12 +27,11 @@ def cmd_run(args: argparse.Namespace) -> int:
     print(f"loaded {len(loaded.df)} rows ({loaded.fmt})", file=sys.stderr)
     result = pipeline.run(loaded.df, cfg, models, progress=_progress, load_errors=len(loaded.errors))
     export.export(result, cfg, args.out, source_name=Path(args.input).name)
-    if args.run_json:
+    if args.recorded_dir:
         meta = {"name": args.name or Path(args.input).stem, "kind": "run", "label": "Recorded run",
                 "rows": len(loaded.df)}
-        Path(args.run_json).write_text(
-            json.dumps(runjson.build(result, meta, withhold_toxic=True), ensure_ascii=False, separators=(",", ":")),
-            encoding="utf-8")
+        omitted = runjson.write_recorded(result, meta, Path(args.recorded_dir))
+        print(f"recorded run written to {args.recorded_dir} ({omitted} rows left out of the published text)", file=sys.stderr)
     a = result.audit
     print(f"\nkept {a['rows_kept']} of {a['rows_in']} ({a['keep_rate']:.1%}) -> {args.out}")
     for g in a["gates"]:
@@ -61,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--config", default=None, help="YAML config (default: built-in defaults)")
     r.add_argument("--out", default="out")
     r.add_argument("--limit", type=int, default=0, help="only use the first N rows")
-    r.add_argument("--run-json", default=None, help="also write the compact JSON the web UI replays")
+    r.add_argument("--recorded-dir", default=None, help="also write the recorded run (index + chunks) the web demo replays")
     r.add_argument("--name", default=None)
     r.add_argument("--device", default=None, help="cpu, cuda or auto (default: auto, or $SFTFORGE_DEVICE)")
     r.set_defaults(fn=cmd_run)

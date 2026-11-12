@@ -76,3 +76,5 @@ Loaders for each format including malformed lines; normalisation; exact and near
 - There is a single config, `configs/default.yaml`; no `strict.yaml`.
 - The web UI lives in `docs/` only and is served from there by FastAPI.
 - The before/after fine-tuning experiment was dropped and is not part of this project.
+- Recorded demo runs are an index plus detail chunks (`docs/data/<run>/`), not one JSON file, so the first load stays small.
+- Model device is chosen automatically (CUDA if available, else CPU) and recorded in the audit.

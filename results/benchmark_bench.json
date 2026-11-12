@@ -272,12 +272,12 @@
     ],
     "balance_cap": 504,
     "timings_s": {
-      "normalise": 1.47,
-      "dedupe": 29.66,
-      "quality": 7.03,
-      "safety": 12.66,
-      "balance": 0.73,
-      "total": 51.55
+      "normalise": 0.6,
+      "dedupe": 23.03,
+      "quality": 5.66,
+      "safety": 10.8,
+      "balance": 0.69,
+      "total": 40.77
     },
     "device": "cuda (NVIDIA GeForce RTX 5060 Ti), float32"
   },

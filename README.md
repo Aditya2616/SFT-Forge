@@ -13,7 +13,7 @@ Stack: Python, Pandas, Hugging Face Datasets. It runs fully offline on CPU after
 <img src="docs/assets/phone-inspector.png" alt="Per-sample inspector on a phone" width="240">
 </p>
 
-The web UI (in `docs/`) replays two real recorded runs, or runs your own pasted or uploaded JSONL through the local server. Tap any sample to see each rule's measured value against its threshold.
+The screenshots show the synthetic-contamination run, where rejections are frequent enough to watch. The web UI (in `docs/`) replays two real recorded runs, or runs your own pasted or uploaded JSONL through the local server. Samples that fail a gate flash orange where they were caught and are knocked out of the lane with their reason code; survivors turn lime as they land in the SFT set. Tap any sample to see why it was rejected first, then every rule's measured value against its threshold.
 
 ## Why
 
@@ -48,14 +48,18 @@ All thresholds are in [`configs/default.yaml`](configs/default.yaml).
 
 ## Quickstart
 
-Python 3.11+ (developed on 3.13). It runs on CPU; if a CUDA build of PyTorch is installed it uses the GPU automatically. The first run downloads two small models (about 0.5 GB) from Hugging Face.
+Python 3.11+ (developed on 3.13). It runs on CPU; if a CUDA build of PyTorch is installed it uses the GPU automatically. On a machine without a GPU you can save a large download by installing the CPU build of PyTorch before the project (I did not run this command, since PyTorch was already installed here):
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+``` The first run downloads two small models (about 0.5 GB) from Hugging Face.
 
 ```bash
 git clone https://github.com/Aditya2616/SFT-Forge.git
 cd SFT-Forge
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"          # on a CPU-only machine, install torch from the CPU index first
+pip install -e ".[dev]"
 
 # run the committed sample (it is already cleaned, so expect almost everything to be kept) and read the audit
 sftforge run data_sample/dolly_cleaned_sample.jsonl --config configs/default.yaml --out out/sample
@@ -78,7 +82,7 @@ All numbers below come from runs on one machine (12-core CPU, one RTX 5060 Ti). 
 
 ### 1. Plain Dolly slice: 5,000 real rows
 
-`python scripts/fetch_data.py && python scripts/run_dolly.py` (about 70 s on the GPU; `results/dolly_headline.md`)
+`python scripts/fetch_data.py && python scripts/run_dolly.py` (about 70 s on the GPU; `results/dolly_headline.md`; it also rewrites the recorded demo run and `data_sample/`)
 
 | Gate | In | Rejected | Reasons |
 |---|---:|---:|---|
@@ -87,7 +91,7 @@ All numbers below come from runs on one machine (12-core CPU, one RTX 5060 Ti). 
 | safety | 4,952 | 15 | toxicity 15 |
 | balance | 4,937 | 304 | category cap (open_qa trimmed from 1,230 to 926) |
 
-4,633 of 5,000 rows kept (92.7%). Dolly is already human-curated, so the gates reject little: 63 rows (1.3%) were rejected by the three gates, and most of the remaining 6.1% loss is the category cap, which is a balancing choice and not a defect finding. 7 PII spans were redacted in kept rows (6 emails, 1 phone number). I did not hand-label these rejects, so there is no precision figure for this run. Stage times on the GPU: dedupe 32 s, quality 11 s, safety 24 s, 69 s in total. The same run on the CPU (an earlier run, with the machine shared with other jobs) took 1,405 s, dominated by toxic-bert (safety 1,191 s).
+4,633 of 5,000 rows kept (92.7%). Dolly is already human-curated, so the gates reject little: 63 rows (1.3%) were rejected by the three gates, and most of the remaining 6.1% loss is the category cap, which is a balancing choice and not a defect finding. 7 PII spans were redacted in kept rows (6 emails, 1 phone number). I did not hand-label these rejects, so there is no precision figure for this run. Stage times on the GPU: dedupe 31 s, quality 12 s, safety 21 s, 67 s in total. The same run on the CPU (an earlier run, with the machine shared with other jobs) took 1,405 s, dominated by toxic-bert (safety 1,191 s).
 
 ### 2. Synthetic contamination benchmark
 
@@ -95,7 +99,7 @@ This is **synthetic contamination, not real-world data**. A seeded script (`scri
 
 ```bash
 python scripts/make_benchmark.py --slice bench --seed 2026
-python scripts/eval_benchmark.py --slice bench --run-json docs/data/contaminated.json
+python scripts/eval_benchmark.py --slice bench --recorded-dir docs/data/contaminated
 ```
 
 Bench slice: 3,180 rows, 615 injected. Thresholds were tuned on the dev slice only; these are bench numbers (`results/benchmark_bench.md`, dev results in `results/benchmark_dev.md`).
@@ -122,9 +126,19 @@ Bench slice: 3,180 rows, 615 injected. Thresholds were tuned on the dev slice on
 **False rejects on untouched rows:** 42 of 2,565 (1.64%). These are not all mistakes: they include real defects already in Dolly (natural duplicates, cut-off answers). One untouched kept row had text redacted as PII that was not PII.
 
 Where it falls short, plainly:
+- **False rejects by the off-topic rule.** The relevance gate compares the question and the answer with a small embedding model and rejects below a cosine of 0.10. It can reject a correct short answer whose words share little with the question: in the first screenshots I took, a correct one-sentence answer about a novel was rejected at a cosine of 0.083. Open the rejected rows of the plain Dolly run and filter on "off topic" to see more. This is part of the 1.6% false-reject rate above.
 - **Truncation (40% recall).** The injector cuts a response at a word boundary and strips trailing punctuation. Rules can only flag cuts that end in a function word, connector or open bracket; a cut after a content word looks like a finished sentence. Catching the rest needs a language model, which I did not add.
 - **Toxicity (51% recall).** The injected snippets are mild-to-moderate prompts from RealToxicityPrompts. At the dev-tuned threshold of 0.5, toxic-bert misses about half. Raising recall costs false rejects on untouched rows; I kept the precision-leaning setting.
 - Precision per gate counts a rejection as correct when the row was an injected defect of any kind, so it is slightly generous to gates that catch another gate's defect.
+
+## The recorded demo format
+
+The static demo must load quickly on a phone, so a recorded run is an index plus chunks, written by `scripts/run_dolly.py` and `scripts/eval_benchmark.py --recorded-dir`:
+
+- `docs/data/<run>/index.json` (about 270 to 410 KB): the audit report, and one small array per row with its id, category, final status, gate, reason codes and a 60-character snippet. This is all the stream animation and the statistics need, and it covers every row.
+- `docs/data/<run>/c<N>.json`: the detail for 100 rows each (texts, rule values, scores), fetched when a sample is opened and kept in memory. `docs/data` is about 6 MB in total.
+
+Text is clipped in the detail files (instruction 240, context 120, response 380 characters). Rows whose text names a specific AI product are left out of the published files by a small deny-list (`DENY` in `src/sftforge/runjson.py`): their text and detail are omitted, but they still appear in the stream and the statistics. That is 12 rows in the Dolly demo, 5 in the benchmark demo and 3 skipped for `data_sample/`. The audit counts are those of the real runs and are unchanged.
 
 ## Design decisions
 
@@ -133,7 +147,7 @@ Where it falls short, plainly:
 - **Reasons and scores on every reject**, and every rule's measured value stored even when it passes, which is what the inspector shows.
 - **One config file** for all thresholds; the effective config is written into `audit.json`.
 - **Category cap is reported separately** from the gates so balancing is not mistaken for quality filtering.
-- **Toxic text is withheld** from the recorded demo JSON files; the inspector shows the scores and reasons but not the text.
+- **Toxic text is withheld** from the recorded demo files; the inspector shows the scores and reasons but not the text.
 
 ## Limitations
 
@@ -149,7 +163,7 @@ Where it falls short, plainly:
 
 ```bash
 ruff check .
-pytest                # 59 fast offline tests with stub embedder and toxicity scorer
+pytest                # 62 fast offline tests with stub embedder and toxicity scorer
 pytest -m slow        # 3 tests with the real MiniLM and toxic-bert models
 ```
 

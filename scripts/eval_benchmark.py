@@ -105,7 +105,7 @@ def main() -> None:
     ap.add_argument("--config", default=str(ROOT / "configs" / "default.yaml"))
     ap.add_argument("--data", default=None)
     ap.add_argument("--out", default=None)
-    ap.add_argument("--run-json", default=None)
+    ap.add_argument("--recorded-dir", default=None, help="write the recorded run for the web demo (index + chunks)")
     ap.add_argument("--device", default=None, help="cpu, cuda or auto")
     args = ap.parse_args()
     data = Path(args.data or ROOT / "data" / f"contaminated_{args.slice}")
@@ -122,14 +122,13 @@ def main() -> None:
     out.with_suffix(".json").write_text(json.dumps(ev, indent=2), encoding="utf-8")
     out.with_suffix(".md").write_text(to_md(ev, f"Contamination benchmark ({args.slice} slice)"), encoding="utf-8")
     print(to_md(ev, f"Contamination benchmark ({args.slice} slice)"))
-    if args.run_json:
+    if args.recorded_dir:
         meta = {"name": "Synthetic contamination benchmark", "kind": "synthetic_contamination",
                 "label": "Recorded run: synthetic contamination", "rows": len(loaded.df),
                 "injected": len(truth), "seed": cfg.seed,
                 "benchmark": {k: v for k, v in ev.items() if k != "audit"}}
-        Path(args.run_json).write_text(
-            json.dumps(runjson.build(res, meta, truth={k: v["defect"] for k, v in truth.items()}, withhold_toxic=True),
-                       ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        omitted = runjson.write_recorded(res, meta, Path(args.recorded_dir), truth={k: v["defect"] for k, v in truth.items()})
+        print(f"recorded run written to {args.recorded_dir} ({omitted} rows left out of the published text)")
     # keep the untouched rejects for a manual look
     audit_rows = [
         {"id": m.id, "gate": m.gate, "reasons": [x["m"] for x in m.reasons], "instruction": m.instruction[:200],

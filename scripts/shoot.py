@@ -31,16 +31,18 @@ def main() -> None:
             page = ctx.new_page()
             page.on("console", lambda m, n=name: errors.append(f"{n} console {m.type}: {m.text}") if m.type in ("error", "warning") else None)
             page.on("pageerror", lambda e, n=name: errors.append(f"{n} pageerror: {e}"))
-            page.goto(args.url, wait_until="load")
+            page.goto(args.url.rstrip("/") + "/?run=bench", wait_until="load")   # the benchmark run has visible rejects
             page.wait_for_function("window.__forge && window.__forge.sim.n > 0")
-            page.wait_for_timeout(3500)
+            page.evaluate("document.querySelector('#stage').scrollIntoView({block: 'center'})")
+            page.wait_for_timeout(4200)
             page.screenshot(path=str(out / f"{name}-streaming.png"))
             report[f"{name}_hscroll"] = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
             page.click("#skip")
             page.wait_for_timeout(600)
             page.screenshot(path=str(out / f"{name}-done.png"), full_page=True)
             # open the inspector on the first rejected row in the log
-            page.evaluate("document.querySelector('#f-view').value='rejected'; document.querySelector('#f-view').dispatchEvent(new Event('change'))")
+            # open a clear, correct rejection: a refusal caught at the quality gate
+            page.evaluate("document.querySelector('#f-reason').value='refusal_boilerplate'; document.querySelector('#f-reason').dispatchEvent(new Event('change'))")
             page.wait_for_timeout(200)
             page.locator("#logsp .row").first.scroll_into_view_if_needed()
             if touch:

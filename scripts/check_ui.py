@@ -40,6 +40,12 @@ def main() -> None:
             page.wait_for_timeout(600)
             report[f"{name}_bench_badge"] = page.inner_text("#badge")
             report[f"{name}_bench_table_rows"] = page.locator("#bench-table tr").count()
+            # the newest row lives in the last detail chunk: the inspector must fetch it on demand
+            page.locator("#logsp .row").first.scroll_into_view_if_needed()
+            (page.locator("#logsp .row").first.tap if touch else page.locator("#logsp .row").first.click)()
+            page.wait_for_function("document.querySelector('#i-body').textContent.includes('Every check')", timeout=15000)
+            report[f"{name}_inspector_last_row"] = page.inner_text("#i-id")
+            page.click("#i-close")
             report[f"{name}_hscroll"] = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
             page.locator("#bench").scroll_into_view_if_needed()
             page.screenshot(path=str(out / f"{name}-bench.png"))

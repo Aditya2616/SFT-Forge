@@ -108,12 +108,12 @@
     "pii_redacted": 4
   },
   "timings_s": {
-    "normalise": 1.31,
-    "dedupe": 31.68,
-    "quality": 10.9,
-    "safety": 24.29,
-    "balance": 1.27,
-    "total": 69.45
+    "normalise": 1.36,
+    "dedupe": 30.9,
+    "quality": 11.85,
+    "safety": 21.33,
+    "balance": 1.8,
+    "total": 67.24
   },
   "config": {
     "seed": 42,
