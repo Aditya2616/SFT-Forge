@@ -36,3 +36,17 @@ def test_end_to_end_with_real_models():
     res = pipeline.run(load_text(text).df)
     reasons = [r[0]["c"] if r else None for r in res.df["reasons"]]
     assert reasons == [None, "exact_duplicate", "toxicity"]
+
+
+def test_messy_sample_with_real_models():
+    from collections import Counter
+    from pathlib import Path
+
+    from sftforge import pipeline
+    from sftforge.loaders import load_path
+
+    sample = Path(__file__).resolve().parent.parent / "examples" / "messy_sample.jsonl"
+    res = pipeline.run(load_path(sample).df)
+    c = Counter(r[0]["c"] for r in res.df["reasons"] if r and r[0]["g"] != "balance")
+    assert c["off_topic"] >= 2 and c["semantic_duplicate"] >= 1 and c["toxicity"] == 1
+    assert res.audit["rows_kept"] < 45

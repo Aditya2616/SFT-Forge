@@ -192,6 +192,15 @@ def default_config() -> dict[str, Any]:
     return _models_cfg.model_dump()
 
 
+@app.get("/api/example")
+def example() -> Response:
+    """The messy sample used by the README quickstart and the 'Load example' button."""
+    path = ROOT / "examples" / "messy_sample.jsonl"
+    if not path.exists():
+        raise HTTPException(404, detail="example file not found")
+    return Response(path.read_text(encoding="utf-8"), media_type="text/plain; charset=utf-8")
+
+
 @app.get("/")
 def index() -> Response:
     # the static demo never calls the API; only the served page is told a backend exists

@@ -50,12 +50,9 @@ def main() -> None:
             page.locator("#bench").scroll_into_view_if_needed()
             page.screenshot(path=str(out / f"{name}-bench.png"))
             if args.live:
-                page.fill("#paste", "\n".join([
-                    '{"instruction": "Why is the sky blue?", "output": "Air scatters short blue wavelengths of sunlight more than red ones."}',
-                    '{"instruction": "Why is the sky blue?", "output": "Air scatters short blue wavelengths of sunlight more than red ones."}',
-                    '{"instruction": "Contact?", "output": "Mail me at jane.doe@example.com or use key AKIAIOSFODNN7EXAMPLE"}',
-                    "not json",
-                ]))
+                page.locator("#example").scroll_into_view_if_needed()
+                (page.locator("#example").tap if touch else page.locator("#example").click)()
+                page.wait_for_function("document.querySelector('#paste').value.length > 1000")
                 page.locator("#go").scroll_into_view_if_needed()
                 (page.locator("#go").tap if touch else page.locator("#go").click)()
                 page.wait_for_function("document.querySelector('#badge').textContent.toLowerCase().includes('live')", timeout=120000)

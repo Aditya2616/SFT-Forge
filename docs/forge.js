@@ -596,26 +596,6 @@ function overrides() {
   setPath(o, 'safety.toxicity.enabled', $('#tox-on')?.value !== '0');
   return o;
 }
-function example() {
-  const aws = 'AKIA' + 'IOSFODNN7' + 'EXAMPLE';
-  const rows = [
-    { instruction: 'Name three primary colours.', output: 'The three primary colours are red, yellow and blue, from which other colours are mixed.', category: 'open_qa' },
-    { instruction: 'Explain how photosynthesis works.', output: 'Plants turn sunlight, water and carbon dioxide into sugar and oxygen inside their chloroplasts.', category: 'general_qa' },
-    { instruction: 'Name three primary colours.', output: 'The three primary colours are red, yellow and blue, from which other colours are mixed.', category: 'open_qa' },
-    { instruction: 'Why is the sky blue?', output: 'As an AI language model, I do not have personal opinions about the colour of the sky.', category: 'general_qa' },
-    { instruction: 'Describe the water cycle in a few sentences.', output: 'Water evaporates from the sea, rises and condenses into clouds, falls as rain and then flows back to the sea and the cycle continues with the', category: 'general_qa' },
-    { instruction: 'How do I contact support about my order?', output: 'You can email jane.doe@example.com or call (415) 555-0142 and mention your order number to contact support.', category: 'open_qa' },
-    { instruction: 'How do I configure the cloud client in my shell?', output: `Add this line to your profile to configure the cloud client: AWS_ACCESS_KEY_ID=${aws}`, category: 'open_qa' },
-    { instruction: 'Cuéntame sobre la historia de España durante la edad media', output: 'España durante la edad media estuvo dividida en varios reinos cristianos y musulmanes que lucharon durante siglos por el territorio.', category: 'general_qa' },
-    { instruction: 'What is the capital of Germany and why is it famous?', output: 'Bananas ripen faster when kept next to apples inside a paper bag on a warm kitchen shelf.', category: 'general_qa' },
-    { instruction: 'Tell me what you think of my neighbour.', output: 'Honestly your neighbour is a worthless idiot and everybody hates him, a stupid moron.', category: 'brainstorming' },
-    { instruction: 'Who wrote Hamlet?', output: 'Hamlet was written by William Shakespeare around the year sixteen hundred as a tragedy about a Danish prince.', category: 'open_qa' },
-    { instruction: 'Who wrote the play Hamlet?', output: 'Hamlet was written by William Shakespeare around the year sixteen hundred as a tragedy about a Danish prince!', category: 'open_qa' },
-    { messages: [{ role: 'user', content: 'What does a compiler do?' }, { role: 'assistant', content: 'A compiler translates source code written in a programming language into machine code that a computer can run.' }] },
-    { conversations: [{ from: 'human', value: 'Give me three ideas for a weekend trip.' }, { from: 'gpt', value: 'You could hike in the hills, visit a nearby coastal town, or spend a weekend exploring a new city by train.' }] },
-  ];
-  return rows.map((r) => JSON.stringify(r)).join('\n');
-}
 async function probeLive() {
   try {
     if (!document.querySelector('meta[name="sftforge-server"]')) throw new Error('static');
@@ -633,7 +613,13 @@ async function probeLive() {
     $('#livenote').className = 'note warn';
   }
 }
-$('#example').addEventListener('click', () => { $('#paste').value = example(); });
+$('#example').addEventListener('click', async () => {
+  try {
+    const res = await fetch('api/example'); if (!res.ok) throw new Error(res.status);
+    $('#paste').value = await res.text();
+    $('#livenote').className = 'note'; $('#livenote').textContent = 'Loaded a 60-row messy example with duplicates, cut-off answers, refusals, PII and fake secrets. Press Run pipeline.';
+  } catch { $('#livenote').className = 'note warn'; $('#livenote').textContent = 'Could not load the example from the server.'; }
+});
 $('#file').addEventListener('change', async (e) => {
   const f = e.target.files[0]; if (!f) return;
   if (f.size > (app.live.limits?.max_bytes || 2e6)) { $('#livenote').textContent = 'That file is over the size limit.'; $('#livenote').className = 'note warn'; return; }

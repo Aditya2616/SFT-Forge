@@ -116,3 +116,8 @@ def test_cli_run_writes_outputs(tmp_path, monkeypatch):
 def test_served_index_announces_the_backend(client):
     r = client.get("/")
     assert r.status_code == 200 and 'name="sftforge-server"' in r.text
+
+
+def test_example_endpoint_serves_the_messy_sample(client):
+    r = client.get("/api/example")
+    assert r.status_code == 200 and len(r.text.strip().splitlines()) == 60

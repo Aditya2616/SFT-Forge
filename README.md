@@ -52,7 +52,9 @@ Python 3.11+ (developed on 3.13). It runs on CPU; if a CUDA build of PyTorch is 
 
 ```bash
 pip install torch --index-url https://download.pytorch.org/whl/cpu
-``` The first run downloads two small models (about 0.5 GB) from Hugging Face.
+```
+
+The first run downloads two small models (about 0.5 GB) from Hugging Face.
 
 ```bash
 git clone https://github.com/Aditya2616/SFT-Forge.git
@@ -61,9 +63,12 @@ python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 
-# run the committed sample (it is already cleaned, so expect almost everything to be kept) and read the audit
+# 1. a small messy file I wrote for this: duplicates, cut-off answers, refusals, PII, fake secrets
+sftforge run examples/messy_sample.jsonl --config configs/default.yaml --out out/messy
+cat out/messy/audit.md
+
+# 2. the committed Dolly sample, already cleaned, so nearly everything is kept
 sftforge run data_sample/dolly_cleaned_sample.jsonl --config configs/default.yaml --out out/sample
-cat out/sample/audit.md
 
 # web UI with live mode (paste or upload JSONL)
 sftforge serve --port 8104       # then open http://127.0.0.1:8104/
@@ -71,6 +76,17 @@ sftforge serve --port 8104       # then open http://127.0.0.1:8104/
 # the device is picked automatically (cuda if available, else cpu); override with
 #   --device cpu   or   SFTFORGE_DEVICE=cpu
 ```
+
+`examples/messy_sample.jsonl` has 60 rows I wrote (MIT, not Dolly): clean rows across eight categories plus exact, near and paraphrase duplicates, cut-off answers, refusals and boilerplate, two wrong-language rows, two off-topic answers, emails, phone numbers and a test card number to redact, two obviously fake secrets in documented example formats, and one mildly toxic row. Running it on the CPU gave this audit (from `out/messy/audit.md`):
+
+| Gate | In | Rejected | Out | Reasons |
+|---|---:|---:|---:|---|
+| dedupe | 60 | 6 | 54 | exact 2, near 2, semantic 2 |
+| quality | 54 | 12 | 42 | refusal 5, truncated 3, wrong language 2, off topic 2 |
+| safety | 42 | 3 | 39 | secret 2, toxicity 1 |
+| balance | 39 | 0 | 39 | none |
+
+39 of 60 rows are kept; 2 emails, 2 phone numbers and 1 card number were redacted in kept rows. Every injected defect was caught and no clean row was rejected, but the file is small and I wrote it to be caught, so it shows what each gate does and is not a measurement (see Results for those). The same file loads behind the **Load a messy example** button in the web UI's "Your data" tab, so you can run it live in one tap.
 
 `out/<name>/` contains `train.jsonl`, `val.jsonl`, chat-format files, a Hugging Face dataset, `DATASET_CARD.md`, `audit.json`, `audit.md` and `rejects.jsonl`. To host the demo statically, serve `docs/` with any file server; recorded runs need no backend.
 
@@ -163,8 +179,8 @@ Text is clipped in the detail files (instruction 240, context 120, response 380 
 
 ```bash
 ruff check .
-pytest                # 62 fast offline tests with stub embedder and toxicity scorer
-pytest -m slow        # 3 tests with the real MiniLM and toxic-bert models
+pytest                # 64 fast offline tests with stub embedder and toxicity scorer
+pytest -m slow        # 4 tests with the real MiniLM and toxic-bert models
 ```
 
 CI (`.github/workflows/ci.yml`) runs lint and the fast tests. The web UI is checked with headless Chromium scripts (`scripts/shoot.py`, `scripts/check_ui.py`) at 1440x900 and 390x844 with touch, in served and static modes.
@@ -176,6 +192,7 @@ src/sftforge/   loaders, normalize, gates/, detectors/, balance, export, card, a
 configs/        default.yaml (every threshold)
 scripts/        fetch_data, make_benchmark, eval_benchmark, run_dolly, smoke, shoot, check_ui
 docs/           web UI (served locally and as a static demo), data/ recorded runs, assets/, notes/ (research, spec)
+examples/       messy_sample.jsonl: 60 hand-written rows with every defect type (MIT)
 data_sample/    1,000 cleaned Dolly rows (CC BY-SA 3.0, see NOTICE.md)
 results/        measured outputs behind the numbers above
 tests/
