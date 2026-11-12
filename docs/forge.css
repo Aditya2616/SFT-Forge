@@ -196,13 +196,13 @@ footer p { margin: 6px 0; max-width: 70em; }
 .brand { min-height: 44px; }
 .sliders input[type=range] { min-height: 44px; }
 #cfg { max-height: 260px; overflow: auto; }
-footer a { display: inline-block; padding: 10px 2px; }
+footer a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; }
 @media (max-width: 720px) {
   .hero { padding-top: 22px; }
   .hero .label { display: none; }
   h1 { font-size: 34px; margin: 0 0 10px; }
   .lede { font-size: 15px; margin-bottom: 8px; }
   .bar { margin: 12px 0 10px; }
-  .seg { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+  .seg { flex-wrap: wrap; max-width: 100%; }
   .seg button { white-space: nowrap; padding: 0 12px; }
 }

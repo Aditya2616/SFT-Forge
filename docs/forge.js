@@ -6,7 +6,7 @@ const GATES = ['dedupe', 'quality', 'safety'];
 const GP = [0.28, 0.52, 0.76];          // gate positions along the flow
 const TRAVEL = 2.1;                     // seconds for a sample to cross the whole flow
 const RUNS = [
-  { id: 'dolly', label: 'Dolly-15k', file: 'data/dolly.json' },
+  { id: 'dolly', label: 'Real Dolly slice', file: 'data/dolly.json' },
   { id: 'bench', label: 'Synthetic contamination', file: 'data/contaminated.json' },
   { id: 'live', label: 'Your data' },
 ];
@@ -512,6 +512,7 @@ function example() {
 }
 async function probeLive() {
   try {
+    if (!document.querySelector('meta[name="sftforge-server"]')) throw new Error('static');
     const h = await fetch('health', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : Promise.reject()));
     if (h.status !== 'ok') throw new Error('x');
     app.live.available = true; app.live.limits = h;

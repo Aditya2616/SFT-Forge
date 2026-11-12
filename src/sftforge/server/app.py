@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, ValidationError
 
@@ -193,8 +193,10 @@ def default_config() -> dict[str, Any]:
 
 
 @app.get("/")
-def index() -> FileResponse:
-    return FileResponse(DOCS / "index.html")
+def index() -> Response:
+    # the static demo never calls the API; only the served page is told a backend exists
+    html = (DOCS / "index.html").read_text(encoding="utf-8").replace("<head>", '<head><meta name="sftforge-server" content="1">', 1)
+    return Response(html, media_type="text/html")
 
 
 if DOCS.exists():

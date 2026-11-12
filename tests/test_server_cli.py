@@ -110,3 +110,8 @@ def test_cli_run_writes_outputs(tmp_path, monkeypatch):
     assert cli.main(["run", str(src), "--out", str(out), "--run-json", str(tmp_path / "run.json")]) == 0
     assert (out / "audit.json").exists() and (out / "train.jsonl").exists()
     assert json.loads((tmp_path / "run.json").read_text(encoding="utf-8"))["meta"]["label"] == "Recorded run"
+
+
+def test_served_index_announces_the_backend(client):
+    r = client.get("/")
+    assert r.status_code == 200 and 'name="sftforge-server"' in r.text
