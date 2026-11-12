@@ -1,0 +1,16 @@
+{
+  "device": "cpu, float32",
+  "rows": 500,
+  "threads": 3,
+  "logical_cores": 12,
+  "timings_s": {
+    "normalise": 0.12,
+    "dedupe": 41.8,
+    "quality": 9.84,
+    "safety": 163.84,
+    "balance": 0.21,
+    "total": 215.81
+  },
+  "rows_per_second": 2.3,
+  "rows_kept": 492
+}

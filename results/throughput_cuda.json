@@ -1,0 +1,16 @@
+{
+  "device": "cuda (NVIDIA GeForce RTX 5060 Ti), float32",
+  "rows": 500,
+  "threads": 2,
+  "logical_cores": 12,
+  "timings_s": {
+    "normalise": 0.08,
+    "dedupe": 12.76,
+    "quality": 1.1,
+    "safety": 6.42,
+    "balance": 0.14,
+    "total": 20.5
+  },
+  "rows_per_second": 24.4,
+  "rows_kept": 492
+}

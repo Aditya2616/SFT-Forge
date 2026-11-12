@@ -1,0 +1,55 @@
+{
+  "rows_in": 60,
+  "rows_kept": 39,
+  "rows_train": 31,
+  "rows_val": 8,
+  "gates": [
+    {
+      "gate": "dedupe",
+      "in": 60,
+      "rejected": 6,
+      "out": 54,
+      "reasons": {
+        "exact_duplicate": 2,
+        "near_duplicate": 2,
+        "semantic_duplicate": 2
+      }
+    },
+    {
+      "gate": "quality",
+      "in": 54,
+      "rejected": 12,
+      "out": 42,
+      "reasons": {
+        "refusal_boilerplate": 5,
+        "truncated": 3,
+        "wrong_language": 2,
+        "off_topic": 2
+      }
+    },
+    {
+      "gate": "safety",
+      "in": 42,
+      "rejected": 3,
+      "out": 39,
+      "reasons": {
+        "secret": 2,
+        "toxicity": 1
+      }
+    },
+    {
+      "gate": "balance",
+      "in": 39,
+      "rejected": 0,
+      "out": 39,
+      "reasons": {}
+    }
+  ],
+  "redactions_in_kept": {
+    "email": 2,
+    "phone": 2,
+    "card": 1
+  },
+  "device": "cpu, float32",
+  "rows_rejected": 21
+}

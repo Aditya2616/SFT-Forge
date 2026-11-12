@@ -536,7 +536,7 @@ function buildAudit() {
   const m = app.meta, t = a.timings_s || {};
   $('#runmeta').innerHTML = [`${fmt(a.rows_in)} rows in, ${fmt(a.rows_kept)} kept (${(a.keep_rate * 100).toFixed(1)}%)`, `train ${fmt(a.rows_train)}, validation ${fmt(a.rows_val)}`,
     `seed ${a.seed}, sftforge ${esc(a.version)}`, `models on ${esc(a.device || 'unknown')}`, `input sha256 ${esc(a.input_sha256.slice(0, 16))}`, `category cap: ${a.balance_cap ?? 'not needed'}`,
-    `time on CPU: ${t.total ?? '?'} s (dedupe ${t.dedupe}, quality ${t.quality}, safety ${t.safety})`, `${esc(m.label || '')} · created ${esc(m.created || '')}`].map((x) => `<div>${x}</div>`).join('');
+    `time: ${t.total ?? '?'} s on the ${String(a.device || '').startsWith('cuda') ? 'GPU' : 'CPU'} (dedupe ${t.dedupe}, quality ${t.quality}, safety ${t.safety})`, `${esc(m.label || '')} · created ${esc(m.created || '')}`].map((x) => `<div>${x}</div>`).join('');
   const base = 'Code: MIT. ';
   $('#credits').innerHTML = base + (m.kind === 'live' ? 'Your pasted data stays in memory and is not stored.'
     : 'Sample text comes from databricks-dolly-15k by Databricks (CC BY-SA 3.0): records shown here are derived from it and stay under CC BY-SA 3.0. ' +
@@ -548,7 +548,7 @@ function buildBench() {
   if (!b) { box.style.display = 'none'; return; }
   box.style.display = '';
   const u = b.untouched;
-  $('#bench-note').textContent = `Defects were injected at known rates into ${fmt(u.n)} untouched Dolly rows plus the injected ones, with a seeded script, so recall is measured against ground truth. False rejects on the untouched rows: ${u.rejected} of ${fmt(u.n)} (${(u.false_reject_rate * 100).toFixed(2)}%), which includes real defects already present in Dolly. Synthetic contamination, not real-world data.`;
+  $('#bench-note').textContent = `Defects were injected at known rates into a clean slice of Dolly rows with a seeded script, so recall is measured against ground truth. ${fmt(u.n)} of the ${fmt(app.audit.rows_in)} rows were left untouched. False rejects on the untouched rows: ${u.rejected} of ${fmt(u.n)} (${(u.false_reject_rate * 100).toFixed(2)}%), which includes real defects already present in Dolly. Synthetic contamination, not real-world data.`;
   $('#bench-table').innerHTML = '<tr><th>Injected defect</th><th>Rows</th><th>Caught</th><th>Recall</th><th>Right reason</th></tr>' +
     Object.entries(b.per_defect).map(([d, v]) => `<tr><td>${esc(d.replace(/_/g, ' '))}</td><td>${v.n}</td><td>${v.caught}</td><td>${(v.recall * 100).toFixed(0)}%</td><td>${v.with_expected_reason ?? (v.expected === 'redacted' ? 'redacted' : '-')}</td></tr>`).join('') +
     '<tr><th colspan="5" style="padding-top:16px">Gate precision on this run</th></tr>' +

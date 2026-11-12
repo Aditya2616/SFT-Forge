@@ -1,7 +1,7 @@
 """FastAPI app: serves the web UI and runs the pipeline on pasted or uploaded JSONL.
 
 Safety of live runs: input is size- and row-capped, parsed only as JSON data (nothing is executed),
-held in memory (never written to disk), and config overrides cannot change which models are loaded.
+held in memory (the only file written is the temporary folder that builds an export zip, deleted afterwards), and config overrides cannot change which models are loaded.
 """
 from __future__ import annotations
 
