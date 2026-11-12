@@ -123,7 +123,8 @@ def main() -> None:
     if args.run_json:
         meta = {"name": "Synthetic contamination benchmark", "kind": "synthetic_contamination",
                 "label": "Recorded run: synthetic contamination", "rows": len(loaded.df),
-                "injected": len(truth), "seed": cfg.seed}
+                "injected": len(truth), "seed": cfg.seed,
+                "benchmark": {k: v for k, v in ev.items() if k != "audit"}}
         Path(args.run_json).write_text(
             json.dumps(runjson.build(res, meta, truth={k: v["defect"] for k, v in truth.items()}, withhold_toxic=True),
                        ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

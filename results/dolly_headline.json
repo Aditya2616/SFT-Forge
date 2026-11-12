@@ -1,0 +1,219 @@
+{
+  "tool": "sftforge",
+  "version": "0.1.0",
+  "seed": 42,
+  "input_sha256": "20e55ae3a1da8876513d6d41b604b78f3b77bfe354947b023431e3c65e0bf7d4",
+  "rows_in": 5000,
+  "load_errors": 0,
+  "rows_kept": 4633,
+  "rows_train": 4401,
+  "rows_val": 232,
+  "keep_rate": 0.9266,
+  "gates": [
+    {
+      "gate": "dedupe",
+      "in": 5000,
+      "rejected": 13,
+      "out": 4987,
+      "reasons": {
+        "semantic_duplicate": 7,
+        "exact_duplicate": 3,
+        "near_duplicate": 3
+      }
+    },
+    {
+      "gate": "quality",
+      "in": 4987,
+      "rejected": 35,
+      "out": 4952,
+      "reasons": {
+        "truncated": 17,
+        "wrong_language": 6,
+        "refusal_boilerplate": 4,
+        "off_topic": 4,
+        "response_too_short": 3,
+        "repetitive": 1
+      }
+    },
+    {
+      "gate": "safety",
+      "in": 4952,
+      "rejected": 15,
+      "out": 4937,
+      "reasons": {
+        "toxicity": 15
+      }
+    },
+    {
+      "gate": "balance",
+      "in": 4937,
+      "rejected": 304,
+      "out": 4633,
+      "reasons": {
+        "category_cap": 304
+      }
+    }
+  ],
+  "balance_cap": 926,
+  "categories": {
+    "brainstorming": {
+      "in": 615,
+      "after_gates": 605,
+      "final": 605
+    },
+    "classification": {
+      "in": 719,
+      "after_gates": 715,
+      "final": 715
+    },
+    "closed_qa": {
+      "in": 562,
+      "after_gates": 559,
+      "final": 559
+    },
+    "creative_writing": {
+      "in": 236,
+      "after_gates": 231,
+      "final": 231
+    },
+    "general_qa": {
+      "in": 711,
+      "after_gates": 699,
+      "final": 699
+    },
+    "information_extraction": {
+      "in": 487,
+      "after_gates": 484,
+      "final": 484
+    },
+    "open_qa": {
+      "in": 1253,
+      "after_gates": 1230,
+      "final": 926
+    },
+    "summarization": {
+      "in": 417,
+      "after_gates": 414,
+      "final": 414
+    }
+  },
+  "redactions_in_kept": {
+    "email": 6,
+    "phone": 1
+  },
+  "edits": {
+    "whitespace": 946,
+    "unicode_nfkc": 84,
+    "pii_redacted": 4
+  },
+  "timings_s": {
+    "normalise": 1.57,
+    "dedupe": 150.3,
+    "quality": 60.51,
+    "safety": 1190.59,
+    "balance": 2.23,
+    "total": 1405.2
+  },
+  "config": {
+    "seed": 42,
+    "models": {
+      "embedder": "sentence-transformers/all-MiniLM-L6-v2",
+      "embedder_revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+      "toxicity": "unitary/toxic-bert",
+      "toxicity_revision": "4d6c22e74ba2fdd26bc4f7238f50766b045a0d94",
+      "perplexity": "HuggingFaceTB/SmolLM2-135M",
+      "perplexity_revision": "93efa2f097d58c2a74874c7e644dbc9b0cee75a2"
+    },
+    "normalize": {
+      "strip_citations": true
+    },
+    "dedupe": {
+      "exact": true,
+      "near": {
+        "enabled": true,
+        "threshold": 0.8,
+        "shingle_words": 5,
+        "num_perm": 128
+      },
+      "semantic": {
+        "enabled": true,
+        "threshold": 0.95
+      }
+    },
+    "quality": {
+      "min_instruction_chars": 5,
+      "min_response_chars": 2,
+      "max_response_chars": 20000,
+      "max_length_ratio": 400.0,
+      "min_alnum_ratio": 0.4,
+      "repetition": {
+        "min_words": 30,
+        "max_repeated_trigram_share": 0.5
+      },
+      "truncation": {
+        "enabled": true,
+        "unpunctuated_min_words": 0
+      },
+      "refusal_boilerplate": true,
+      "language": {
+        "enabled": true,
+        "allowed": [
+          "ENGLISH"
+        ],
+        "min_chars": 40,
+        "max_other_confidence": 0.8,
+        "max_allowed_confidence": 0.2
+      },
+      "relevance": {
+        "enabled": true,
+        "min_cosine": 0.1,
+        "min_response_words": 8
+      },
+      "perplexity": {
+        "enabled": false,
+        "max_ppl": 2500.0
+      }
+    },
+    "safety": {
+      "pii": {
+        "action": "redact",
+        "types": [
+          "email",
+          "phone",
+          "card",
+          "ssn",
+          "ipv4",
+          "iban"
+        ]
+      },
+      "secrets": true,
+      "toxicity": {
+        "enabled": true,
+        "labels": [
+          "toxic",
+          "severe_toxic",
+          "threat",
+          "identity_hate"
+        ],
+        "threshold": 0.5,
+        "max_tokens": 128,
+        "chunk_chars": 500,
+        "max_chunks": 5,
+        "allow_categories": [
+          "classification"
+        ]
+      },
+      "unsafe_rules": true
+    },
+    "balance": {
+      "enabled": true,
+      "max_share": 0.2,
+      "val_fraction": 0.05,
+      "min_rows": 100
+    },
+    "export": {
+      "chat_template": "chatml",
+      "hf_dataset": true
+    }
+  }
+}

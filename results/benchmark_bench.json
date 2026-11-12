@@ -1,0 +1,284 @@
+{
+  "per_defect": {
+    "exact_dup": {
+      "n": 60,
+      "expected": "rejected at dedupe",
+      "caught": 60,
+      "recall": 1.0,
+      "at_intended_gate": 60,
+      "with_expected_reason": 60,
+      "first_reasons": {
+        "exact_duplicate": 60
+      }
+    },
+    "near_dup": {
+      "n": 60,
+      "expected": "rejected at dedupe",
+      "caught": 60,
+      "recall": 1.0,
+      "at_intended_gate": 60,
+      "with_expected_reason": 60,
+      "first_reasons": {
+        "near_duplicate": 46,
+        "semantic_duplicate": 14
+      }
+    },
+    "off_topic": {
+      "n": 60,
+      "expected": "rejected at quality",
+      "caught": 52,
+      "recall": 0.867,
+      "at_intended_gate": 44,
+      "with_expected_reason": 42,
+      "first_reasons": {
+        "off_topic": 42,
+        "near_duplicate": 8,
+        "wrong_language": 2
+      }
+    },
+    "paraphrase_dup": {
+      "n": 60,
+      "expected": "rejected at dedupe",
+      "caught": 57,
+      "recall": 0.95,
+      "at_intended_gate": 57,
+      "with_expected_reason": 57,
+      "first_reasons": {
+        "semantic_duplicate": 48,
+        "near_duplicate": 9
+      }
+    },
+    "pii_card": {
+      "n": 15,
+      "expected": "redacted",
+      "caught": 15,
+      "recall": 1.0,
+      "rejected_by_other_gate": 0
+    },
+    "pii_email": {
+      "n": 15,
+      "expected": "redacted",
+      "caught": 14,
+      "recall": 0.933,
+      "rejected_by_other_gate": 1
+    },
+    "pii_iban": {
+      "n": 15,
+      "expected": "redacted",
+      "caught": 15,
+      "recall": 1.0,
+      "rejected_by_other_gate": 0
+    },
+    "pii_ipv4": {
+      "n": 15,
+      "expected": "redacted",
+      "caught": 15,
+      "recall": 1.0,
+      "rejected_by_other_gate": 0
+    },
+    "pii_phone": {
+      "n": 15,
+      "expected": "redacted",
+      "caught": 15,
+      "recall": 1.0,
+      "rejected_by_other_gate": 0
+    },
+    "pii_ssn": {
+      "n": 15,
+      "expected": "redacted",
+      "caught": 15,
+      "recall": 1.0,
+      "rejected_by_other_gate": 0
+    },
+    "refusal": {
+      "n": 60,
+      "expected": "rejected at quality",
+      "caught": 60,
+      "recall": 1.0,
+      "at_intended_gate": 60,
+      "with_expected_reason": 60,
+      "first_reasons": {
+        "refusal_boilerplate": 60
+      }
+    },
+    "secret_aws": {
+      "n": 15,
+      "expected": "rejected at safety",
+      "caught": 15,
+      "recall": 1.0,
+      "at_intended_gate": 13,
+      "with_expected_reason": 13,
+      "first_reasons": {
+        "secret": 13,
+        "off_topic": 2
+      }
+    },
+    "secret_generic": {
+      "n": 15,
+      "expected": "rejected at safety",
+      "caught": 15,
+      "recall": 1.0,
+      "at_intended_gate": 14,
+      "with_expected_reason": 14,
+      "first_reasons": {
+        "secret": 14,
+        "off_topic": 1
+      }
+    },
+    "secret_github": {
+      "n": 15,
+      "expected": "rejected at safety",
+      "caught": 15,
+      "recall": 1.0,
+      "at_intended_gate": 13,
+      "with_expected_reason": 13,
+      "first_reasons": {
+        "secret": 13,
+        "wrong_language": 2
+      }
+    },
+    "secret_private_key": {
+      "n": 15,
+      "expected": "rejected at safety",
+      "caught": 15,
+      "recall": 1.0,
+      "at_intended_gate": 15,
+      "with_expected_reason": 15,
+      "first_reasons": {
+        "secret": 15
+      }
+    },
+    "toxic": {
+      "n": 45,
+      "expected": "rejected at safety",
+      "caught": 23,
+      "recall": 0.511,
+      "at_intended_gate": 20,
+      "with_expected_reason": 20,
+      "first_reasons": {
+        "toxicity": 20,
+        "off_topic": 2,
+        "truncated": 1
+      }
+    },
+    "truncated": {
+      "n": 60,
+      "expected": "rejected at quality",
+      "caught": 24,
+      "recall": 0.4,
+      "at_intended_gate": 24,
+      "with_expected_reason": 24,
+      "first_reasons": {
+        "truncated": 24
+      }
+    },
+    "wrong_language": {
+      "n": 60,
+      "expected": "rejected at quality",
+      "caught": 58,
+      "recall": 0.967,
+      "at_intended_gate": 58,
+      "with_expected_reason": 58,
+      "first_reasons": {
+        "wrong_language": 58
+      }
+    }
+  },
+  "per_gate": {
+    "dedupe": {
+      "rejected": 200,
+      "injected_defects": 186,
+      "precision": 0.93
+    },
+    "quality": {
+      "rejected": 215,
+      "injected_defects": 194,
+      "precision": 0.902
+    },
+    "safety": {
+      "rejected": 82,
+      "injected_defects": 75,
+      "precision": 0.915
+    }
+  },
+  "untouched": {
+    "n": 2565,
+    "rejected": 42,
+    "false_reject_rate": 0.0164,
+    "balanced_out": 156,
+    "reasons": {
+      "truncated": 12,
+      "near_duplicate": 8,
+      "toxicity": 7,
+      "semantic_duplicate": 5,
+      "refusal_boilerplate": 3,
+      "wrong_language": 3,
+      "response_too_long": 1,
+      "off_topic": 1,
+      "response_too_short": 1,
+      "exact_duplicate": 1
+    },
+    "note": "includes real defects that Dolly itself contains (natural duplicates, cut-off answers); see audit sample"
+  },
+  "pii_false_redactions_on_untouched": 1,
+  "audit": {
+    "rows_in": 3180,
+    "rows_kept": 2521,
+    "gates": [
+      {
+        "gate": "dedupe",
+        "in": 3180,
+        "rejected": 200,
+        "out": 2980,
+        "reasons": {
+          "near_duplicate": 71,
+          "semantic_duplicate": 68,
+          "exact_duplicate": 61
+        }
+      },
+      {
+        "gate": "quality",
+        "in": 2980,
+        "rejected": 215,
+        "out": 2765,
+        "reasons": {
+          "wrong_language": 65,
+          "refusal_boilerplate": 63,
+          "off_topic": 48,
+          "truncated": 37,
+          "response_too_long": 1,
+          "response_too_short": 1
+        }
+      },
+      {
+        "gate": "safety",
+        "in": 2765,
+        "rejected": 82,
+        "out": 2683,
+        "reasons": {
+          "secret": 55,
+          "toxicity": 27
+        }
+      },
+      {
+        "gate": "balance",
+        "in": 2683,
+        "rejected": 162,
+        "out": 2521,
+        "reasons": {
+          "category_cap": 162
+        }
+      }
+    ],
+    "balance_cap": 504,
+    "timings_s": {
+      "normalise": 1.16,
+      "dedupe": 139.15,
+      "quality": 34.03,
+      "safety": 564.13,
+      "balance": 0.84,
+      "total": 739.3
+    }
+  },
+  "slice": "bench"
+}

@@ -139,7 +139,7 @@ def load_toxic(rng: random.Random, need: int) -> list[str]:
     for r in read_jsonl(ROOT / "data" / "real-toxicity-prompts" / "prompts.jsonl"):
         p = r.get("prompt") or {}
         t, tox = p.get("text") or "", p.get("toxicity")
-        if tox is not None and tox >= 0.9 and 40 <= len(t) <= 220:
+        if tox is not None and tox >= 0.8 and 40 <= len(t) <= 220 and t.rstrip()[-1:] in ".!?\"":
             out.append(t.strip())
     rng.shuffle(out)
     return out[:need]
