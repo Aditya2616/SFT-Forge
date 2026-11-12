@@ -57,7 +57,7 @@ python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"          # on a CPU-only machine, install torch from the CPU index first
 
-# clean the committed sample and look at the audit
+# run the committed sample (it is already cleaned, so expect almost everything to be kept) and read the audit
 sftforge run data_sample/dolly_cleaned_sample.jsonl --config configs/default.yaml --out out/sample
 cat out/sample/audit.md
 
