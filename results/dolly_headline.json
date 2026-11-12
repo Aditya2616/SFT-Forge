@@ -2,6 +2,7 @@
   "tool": "sftforge",
   "version": "0.1.0",
   "seed": 42,
+  "device": "cuda (NVIDIA GeForce RTX 5060 Ti), float32",
   "input_sha256": "20e55ae3a1da8876513d6d41b604b78f3b77bfe354947b023431e3c65e0bf7d4",
   "rows_in": 5000,
   "load_errors": 0,
@@ -107,12 +108,12 @@
     "pii_redacted": 4
   },
   "timings_s": {
-    "normalise": 1.57,
-    "dedupe": 150.3,
-    "quality": 60.51,
-    "safety": 1190.59,
-    "balance": 2.23,
-    "total": 1405.2
+    "normalise": 1.31,
+    "dedupe": 31.68,
+    "quality": 10.9,
+    "safety": 24.29,
+    "balance": 1.27,
+    "total": 69.45
   },
   "config": {
     "seed": 42,

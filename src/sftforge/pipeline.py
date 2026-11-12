@@ -56,5 +56,5 @@ def run(raw: pd.DataFrame, cfg: Config | None = None, models: Models | None = No
     timed("safety", lambda: safety.run(df, cfg, ctx))
     info = timed("balance", lambda: balance.run(df, cfg.balance, cfg.seed))
     timings["total"] = sum(timings.values())
-    rep = audit.build(df, cfg, raw_hash, info["cap"], timings, load_errors)  # type: ignore[arg-type]
+    rep = audit.build(df, cfg, raw_hash, info["cap"], timings, load_errors, models.device_label)  # type: ignore[arg-type]
     return Result(df, rep)

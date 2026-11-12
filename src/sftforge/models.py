@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import pickle
 from pathlib import Path
 from typing import Any, Protocol
@@ -9,6 +10,20 @@ from typing import Any, Protocol
 import numpy as np
 
 from .schema import ModelsCfg
+
+
+def resolve_device(requested: str | None = None) -> str:
+    """'cuda' when available, else 'cpu'. Override with the argument or the SFTFORGE_DEVICE variable."""
+    want = (requested or os.environ.get("SFTFORGE_DEVICE") or "auto").lower()
+    if want != "auto":
+        return want
+    import torch
+
+    return "cuda" if torch.cuda.is_available() else "cpu"
+
+
+def _is_oom(exc: BaseException) -> bool:
+    return type(exc).__name__ == "OutOfMemoryError" or "out of memory" in str(exc).lower()
 
 
 class Embedder(Protocol):
@@ -24,30 +39,50 @@ class PerplexityScorer(Protocol):
 
 
 class SbertEmbedder:
-    def __init__(self, name: str, revision: str | None = None, max_seq_length: int = 128):
+    def __init__(self, name: str, revision: str | None = None, max_seq_length: int = 128, device: str = "cpu"):
         from sentence_transformers import SentenceTransformer
 
-        self.model = SentenceTransformer(name, revision=revision, device="cpu")
+        self.device = device
+        self.model = SentenceTransformer(name, revision=revision, device=device)
         self.model.max_seq_length = max_seq_length
+
+    def _encode(self, texts: list[str], batch: int) -> np.ndarray:
+        return self.model.encode(
+            texts, batch_size=batch, normalize_embeddings=True, convert_to_numpy=True, show_progress_bar=False
+        ).astype(np.float32)
 
     def encode(self, texts: list[str]) -> np.ndarray:
         if not texts:
             return np.zeros((0, 384), dtype=np.float32)
-        return self.model.encode(
-            texts, batch_size=64, normalize_embeddings=True, convert_to_numpy=True, show_progress_bar=False
-        ).astype(np.float32)
+        try:
+            return self._encode(texts, 64)
+        except Exception as exc:  # a CUDA out-of-memory error retries smaller, then on the CPU
+            if not _is_oom(exc):
+                raise
+            import torch
+
+            torch.cuda.empty_cache()
+            try:
+                return self._encode(texts, 8)
+            except Exception as exc2:
+                if not _is_oom(exc2):
+                    raise
+                self.model.to("cpu")
+                self.device = "cpu"
+                return self._encode(texts, 32)
 
 
 class ToxicBert:
     """unitary/toxic-bert: multi-label (toxic, severe_toxic, obscene, threat, insult, identity_hate)."""
 
-    def __init__(self, name: str, revision: str | None = None, max_tokens: int = 128):
+    def __init__(self, name: str, revision: str | None = None, max_tokens: int = 128, device: str = "cpu"):
         import torch
         from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
         self.torch = torch
+        self.device = device
         self.tok = AutoTokenizer.from_pretrained(name, revision=revision)
-        self.model = AutoModelForSequenceClassification.from_pretrained(name, revision=revision).eval()
+        self.model = AutoModelForSequenceClassification.from_pretrained(name, revision=revision).eval().to(device)
         n = len(self.model.config.id2label)
         self.labels = [self.model.config.id2label[i] for i in range(n)]
         self.max_tokens = max_tokens
@@ -55,27 +90,41 @@ class ToxicBert:
     def score(self, texts: list[str]) -> list[dict[str, float]]:
         res: dict[int, dict[str, float]] = {}
         order = sorted(range(len(texts)), key=lambda i: len(texts[i]))
-        for s in range(0, len(order), 32):
-            idx = order[s : s + 32]
+        batch, s = 32, 0
+        while s < len(order):
+            idx = order[s : s + batch]
             enc = self.tok([texts[i] for i in idx], truncation=True, max_length=self.max_tokens,
                            padding=True, return_tensors="pt")
-            with self.torch.no_grad():
-                p = self.torch.sigmoid(self.model(**enc).logits).numpy()
+            try:
+                with self.torch.no_grad():
+                    p = self.torch.sigmoid(self.model(**enc.to(self.device)).logits).float().cpu().numpy()
+            except Exception as exc:  # CUDA out of memory: retry smaller, then fall back to the CPU
+                if not _is_oom(exc):
+                    raise
+                self.torch.cuda.empty_cache()
+                if batch > 4:
+                    batch //= 4
+                else:
+                    self.model.to("cpu")
+                    self.device = "cpu"
+                continue
+            s += len(idx)
             for k, i in enumerate(idx):
                 res[i] = {lab: float(p[k, j]) for j, lab in enumerate(self.labels)}
         return [res[i] for i in range(len(texts))]
 
 
 class SmolPerplexity:
-    """Perplexity of a text under SmolLM2-135M, on CPU."""
+    """Perplexity of a text under SmolLM2-135M (float32 on the chosen device)."""
 
-    def __init__(self, name: str, revision: str | None = None, max_tokens: int = 128):
+    def __init__(self, name: str, revision: str | None = None, max_tokens: int = 128, device: str = "cpu"):
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         self.torch = torch
+        self.device = device
         self.tok = AutoTokenizer.from_pretrained(name, revision=revision)
-        self.model = AutoModelForCausalLM.from_pretrained(name, revision=revision).eval()
+        self.model = AutoModelForCausalLM.from_pretrained(name, revision=revision).eval().to(device)
         self.max_tokens = max_tokens
 
     def score(self, texts: list[str]) -> list[float]:
@@ -87,8 +136,8 @@ class SmolPerplexity:
             enc = [self.tok(texts[i], truncation=True, max_length=self.max_tokens)["input_ids"] or [0] for i in idx]
             width = max(len(e) for e in enc)
             pad = self.tok.eos_token_id or 0
-            ids = torch.tensor([e + [pad] * (width - len(e)) for e in enc])
-            mask = torch.tensor([[1] * len(e) + [0] * (width - len(e)) for e in enc])
+            ids = torch.tensor([e + [pad] * (width - len(e)) for e in enc], device=self.device)
+            mask = torch.tensor([[1] * len(e) + [0] * (width - len(e)) for e in enc], device=self.device)
             with torch.no_grad():
                 logits = self.model(input_ids=ids, attention_mask=mask).logits
             lp = torch.log_softmax(logits[:, :-1].float(), dim=-1)
@@ -96,7 +145,7 @@ class SmolPerplexity:
             m = mask[:, 1:].float()
             mean = (nll * m).sum(1) / m.sum(1).clamp(min=1)
             for k, i in enumerate(idx):
-                res[i] = float(torch.exp(mean[k]))
+                res[i] = float(torch.exp(mean[k]).cpu())
         return res
 
 
@@ -148,31 +197,56 @@ class Models:
 
     def __init__(self, cfg: ModelsCfg, embedder: Embedder | None = None,
                  toxicity: ToxicityScorer | None = None, perplexity: PerplexityScorer | None = None,
-                 cache_dir: str | Path | None = None):
+                 cache_dir: str | Path | None = None, device: str | None = None):
         self.cfg = cfg
+        self._device_req = device
+        self._device: str | None = None
         self._embedder, self._tox, self._ppl = embedder, toxicity, perplexity
         self.cache_dir = Path(cache_dir) if cache_dir else None
 
     @property
+    def device(self) -> str:
+        """Device the real models run on, chosen on first use. Injected stubs ignore it."""
+        if self._device is None:
+            self._device = resolve_device(self._device_req)
+            if self._device.startswith("cuda"):
+                import torch
+
+                torch.set_num_threads(2)  # the GPU does the work; keep the CPU free
+        return self._device
+
+    @property
+    def device_label(self) -> str:
+        """Device description recorded in the audit report."""
+        if self._embedder is not None and not hasattr(self._embedder, "model") and not hasattr(self._embedder, "inner"):
+            return "stub models"
+        dev = self.device
+        if dev.startswith("cuda"):
+            import torch
+
+            return f"{dev} ({torch.cuda.get_device_name(0)}), float32"
+        return f"{dev}, float32"
+
+    @property
     def embedder(self) -> Embedder:
         if self._embedder is None:
-            emb: Embedder = SbertEmbedder(self.cfg.embedder, self.cfg.embedder_revision)
+            emb: Embedder = SbertEmbedder(self.cfg.embedder, self.cfg.embedder_revision, device=self.device)
             if self.cache_dir:
-                emb = CachedEmbedder(emb, DiskCache(self.cache_dir / "embed.pkl"), self.cfg.embedder)
+                emb = CachedEmbedder(emb, DiskCache(self.cache_dir / "embed.pkl"), f"{self.cfg.embedder}@{self.device}")
             self._embedder = emb
         return self._embedder
 
     @property
     def toxicity(self) -> ToxicityScorer:
         if self._tox is None:
-            tox: ToxicityScorer = ToxicBert(self.cfg.toxicity, self.cfg.toxicity_revision)
+            tox: ToxicityScorer = ToxicBert(self.cfg.toxicity, self.cfg.toxicity_revision, device=self.device)
             if self.cache_dir:
-                tox = CachedToxicity(tox, DiskCache(self.cache_dir / "toxicity.pkl"), self.cfg.toxicity)
+                tox = CachedToxicity(tox, DiskCache(self.cache_dir / "toxicity.pkl"), f"{self.cfg.toxicity}@{self.device}")
             self._tox = tox
         return self._tox
 
     @property
     def perplexity(self) -> PerplexityScorer:
         if self._ppl is None:
-            self._ppl = SmolPerplexity(self.cfg.perplexity, self.cfg.perplexity_revision)
+            self._ppl = SmolPerplexity(self.cfg.perplexity, self.cfg.perplexity_revision, device=self.device)
         return self._ppl

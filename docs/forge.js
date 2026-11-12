@@ -429,7 +429,7 @@ function buildAudit() {
   $('#cfg').innerHTML = flat(a.config).filter(([k]) => !skip.has(k)).map(([k, v]) => `<div>${esc(k)}: <b style="color:var(--bone)">${esc(v)}</b></div>`).join('');
   const m = app.meta, t = a.timings_s || {};
   $('#runmeta').innerHTML = [`${fmt(a.rows_in)} rows in, ${fmt(a.rows_kept)} kept (${(a.keep_rate * 100).toFixed(1)}%)`, `train ${fmt(a.rows_train)}, validation ${fmt(a.rows_val)}`,
-    `seed ${a.seed}, sftforge ${esc(a.version)}`, `input sha256 ${esc(a.input_sha256.slice(0, 16))}`, `category cap: ${a.balance_cap ?? 'not needed'}`,
+    `seed ${a.seed}, sftforge ${esc(a.version)}`, `models on ${esc(a.device || 'unknown')}`, `input sha256 ${esc(a.input_sha256.slice(0, 16))}`, `category cap: ${a.balance_cap ?? 'not needed'}`,
     `time on CPU: ${t.total ?? '?'} s (dedupe ${t.dedupe}, quality ${t.quality}, safety ${t.safety})`, `${esc(m.label || '')} · created ${esc(m.created || '')}`].map((x) => `<div>${x}</div>`).join('');
   const base = 'Code: MIT. ';
   $('#credits').innerHTML = base + (m.kind === 'live' ? 'Your pasted data stays in memory and is not stored.'

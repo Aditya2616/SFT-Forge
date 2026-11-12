@@ -83,7 +83,8 @@ def evaluate(df, truth: dict[str, dict]) -> dict:
 
 
 def to_md(ev: dict, title: str) -> str:
-    L = [f"# {title}", "", "Synthetic contamination: defects were injected at known rates; counts below are real measurements.", "",
+    L = [f"# {title}", "", "Synthetic contamination: defects were injected at known rates; counts below are real measurements.",
+         "", f"Models ran on: {ev.get('audit', {}).get('device', 'unknown')}.", "",
          "| Defect | n | Recall | Right gate | Right reason | Notes |", "|---|---:|---:|---:|---:|---|"]
     for d, v in ev["per_defect"].items():
         note = v.get("first_reasons") or (f"rejected elsewhere: {v['rejected_by_other_gate']}" if "rejected_by_other_gate" in v else "")
@@ -105,15 +106,16 @@ def main() -> None:
     ap.add_argument("--data", default=None)
     ap.add_argument("--out", default=None)
     ap.add_argument("--run-json", default=None)
+    ap.add_argument("--device", default=None, help="cpu, cuda or auto")
     args = ap.parse_args()
     data = Path(args.data or ROOT / "data" / f"contaminated_{args.slice}")
     cfg = Config.load(args.config)
     loaded = load_path(data / "benchmark.jsonl")
     truth = json.loads((data / "truth.json").read_text(encoding="utf-8"))
-    models = Models(cfg.models, cache_dir=ROOT / ".cache")
+    models = Models(cfg.models, cache_dir=ROOT / ".cache", device=args.device)
     res = pipeline.run(loaded.df, cfg, models)
     ev = evaluate(res.df, truth)
-    ev["audit"] = {k: res.audit[k] for k in ("rows_in", "rows_kept", "gates", "balance_cap", "timings_s")}
+    ev["audit"] = {k: res.audit[k] for k in ("rows_in", "rows_kept", "gates", "balance_cap", "timings_s", "device")}
     ev["slice"] = args.slice
     out = Path(args.out or ROOT / "results" / f"benchmark_{args.slice}")
     out.parent.mkdir(parents=True, exist_ok=True)

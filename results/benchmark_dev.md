@@ -2,6 +2,8 @@
 
 Synthetic contamination: defects were injected at known rates; counts below are real measurements.
 
+Models ran on: cuda (NVIDIA GeForce RTX 5060 Ti), float32.
+
 | Defect | n | Recall | Right gate | Right reason | Notes |
 |---|---:|---:|---:|---:|---|
 | exact_dup | 60 | 100.0% | 60 | 60 | {'exact_duplicate': 60} |

@@ -48,7 +48,7 @@ All thresholds are in [`configs/default.yaml`](configs/default.yaml).
 
 ## Quickstart
 
-Python 3.11+ (developed on 3.13). The first run downloads two small models (about 0.5 GB) from Hugging Face.
+Python 3.11+ (developed on 3.13). It runs on CPU; if a CUDA build of PyTorch is installed it uses the GPU automatically. The first run downloads two small models (about 0.5 GB) from Hugging Face.
 
 ```bash
 git clone https://github.com/Aditya2616/SFT-Forge.git
@@ -63,6 +63,9 @@ cat out/sample/audit.md
 
 # web UI with live mode (paste or upload JSONL)
 sftforge serve --port 8104       # then open http://127.0.0.1:8104/
+
+# the device is picked automatically (cuda if available, else cpu); override with
+#   --device cpu   or   SFTFORGE_DEVICE=cpu
 ```
 
 `out/<name>/` contains `train.jsonl`, `val.jsonl`, chat-format files, a Hugging Face dataset, `DATASET_CARD.md`, `audit.json`, `audit.md` and `rejects.jsonl`. To host the demo statically, serve `docs/` with any file server; recorded runs need no backend.
@@ -71,11 +74,11 @@ Live mode limits: 500 rows and 2 MB per request (`SFTFORGE_MAX_ROWS`, `SFTFORGE_
 
 ## Results
 
-Everything below came from runs on a 12-core CPU machine (no GPU), with the commands that reproduce them. Slices of the shuffled Dolly-15k rows are disjoint: rows 0-3000 (dev, used to tune thresholds), 3000-6000 (bench, reported), 6000-11000 (headline run).
+All numbers below come from runs on one machine (12-core CPU, one RTX 5060 Ti). The models ran on the GPU in float32, and the audit report of every run records the device. The dev-slice tuning and the bench-slice report used the same device. The CPU gave the same counts when I first ran them there, so the choice of device did not change a single result here, but scores can differ in the last decimals between devices. The commands that reproduce each result are shown. Slices of the shuffled Dolly-15k rows are disjoint: rows 0-3000 (dev, used to tune thresholds), 3000-6000 (bench, reported), 6000-11000 (headline run).
 
 ### 1. Plain Dolly slice: 5,000 real rows
 
-`python scripts/fetch_data.py && python scripts/run_dolly.py` (about 23 minutes on CPU; `results/dolly_headline.md`)
+`python scripts/fetch_data.py && python scripts/run_dolly.py` (about 70 s on the GPU; `results/dolly_headline.md`)
 
 | Gate | In | Rejected | Reasons |
 |---|---:|---:|---|
@@ -84,7 +87,7 @@ Everything below came from runs on a 12-core CPU machine (no GPU), with the comm
 | safety | 4,952 | 15 | toxicity 15 |
 | balance | 4,937 | 304 | category cap (open_qa trimmed from 1,230 to 926) |
 
-4,633 of 5,000 rows kept (92.7%). Dolly is already human-curated, so the gates reject little: 63 rows (1.3%) were rejected by the three gates, and most of the remaining 6.1% loss is the category cap, which is a balancing choice and not a defect finding. 7 PII spans were redacted in kept rows (6 emails, 1 phone number). I did not hand-label these rejects, so there is no precision figure for this run. Wall time was dominated by toxic-bert: dedupe 150 s, quality 61 s, safety 1,191 s, about 3.6 rows per second overall.
+4,633 of 5,000 rows kept (92.7%). Dolly is already human-curated, so the gates reject little: 63 rows (1.3%) were rejected by the three gates, and most of the remaining 6.1% loss is the category cap, which is a balancing choice and not a defect finding. 7 PII spans were redacted in kept rows (6 emails, 1 phone number). I did not hand-label these rejects, so there is no precision figure for this run. Stage times on the GPU: dedupe 32 s, quality 11 s, safety 24 s, 69 s in total. The same run on the CPU (an earlier run, with the machine shared with other jobs) took 1,405 s, dominated by toxic-bert (safety 1,191 s).
 
 ### 2. Synthetic contamination benchmark
 
@@ -138,7 +141,7 @@ Where it falls short, plainly:
 - toxic-bert has known biases around identity terms and dialect; the classification exemption is a blunt instrument.
 - The language gate only allows English by default and skips short texts.
 - Dolly is already clean, so the plain run says little about how the pipeline behaves on messy web-scale data. The benchmark is synthetic and tests the defects I thought to inject.
-- CPU throughput is about 3.6 rows per second with toxic-bert on; live mode is capped at 500 rows for that reason.
+- CPU throughput is the limit on machines without a GPU. A dedicated CPU measurement on 500 rows of the committed sample, with the CPU at 100% load from other jobs and 3 threads, took 176 s (about 2.8 rows per second, safety 135 s). The same 500 rows on the GPU took 20 s, including model loading. Live mode is capped at 500 rows for that reason.
 - I did not train any model on the cleaned data, so I make no claim about its effect on downstream quality.
 - Only the local pipeline paths are implemented; there are no hosted-model adapters.
 
@@ -146,7 +149,7 @@ Where it falls short, plainly:
 
 ```bash
 ruff check .
-pytest                # 58 fast offline tests with stub embedder and toxicity scorer
+pytest                # 59 fast offline tests with stub embedder and toxicity scorer
 pytest -m slow        # 3 tests with the real MiniLM and toxic-bert models
 ```
 

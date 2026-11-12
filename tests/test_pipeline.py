@@ -195,3 +195,13 @@ def test_chunking_covers_long_text_and_toxicity_in_the_tail(good_rows, cfg, mode
 def test_small_inputs_are_not_capped(good_rows, models):
     res = pipeline.run(make_df(good_rows), Config(balance=BalanceCfg(max_share=0.2, val_fraction=0)), models)
     assert (res.df["status"] == "kept").all()
+
+
+def test_device_override_and_audit_records_it(monkeypatch, good_rows, models):
+    from sftforge.models import resolve_device
+
+    assert resolve_device("cpu") == "cpu"
+    monkeypatch.setenv("SFTFORGE_DEVICE", "cpu")
+    assert resolve_device(None) == "cpu"
+    res = pipeline.run(make_df(good_rows), Config(balance=BalanceCfg(enabled=False)), models)
+    assert res.audit["device"] == "stub models"

@@ -19,7 +19,7 @@ def input_hash(df: pd.DataFrame) -> str:
 
 
 def build(df: pd.DataFrame, cfg: Config, raw_hash: str, cap: int | None, timings: dict[str, float],
-          load_errors: int = 0) -> dict[str, Any]:
+          load_errors: int = 0, device: str = "unknown") -> dict[str, Any]:
     n = len(df)
     gates: list[dict[str, Any]] = []
     remaining = n
@@ -53,6 +53,7 @@ def build(df: pd.DataFrame, cfg: Config, raw_hash: str, cap: int | None, timings
         "tool": "sftforge",
         "version": __version__,
         "seed": cfg.seed,
+        "device": device,
         "input_sha256": raw_hash,
         "rows_in": n,
         "load_errors": load_errors,
@@ -80,6 +81,7 @@ def to_markdown(a: dict[str, Any]) -> str:
         f"- Rows in: **{a['rows_in']}**, kept: **{a['rows_kept']}** ({a['keep_rate']:.1%}); "
         f"train {a['rows_train']}, validation {a['rows_val']}",
         f"- Input SHA-256: `{a['input_sha256'][:16]}...`, seed {a['seed']}, sftforge {a['version']}",
+        f"- Models ran on: {a.get('device', 'unknown')}",
         "",
         "## Gates",
         "",

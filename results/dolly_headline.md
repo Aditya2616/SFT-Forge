@@ -2,6 +2,7 @@
 
 - Rows in: **5000**, kept: **4633** (92.7%); train 4401, validation 232
 - Input SHA-256: `20e55ae3a1da8876...`, seed 42, sftforge 0.1.0
+- Models ran on: cuda (NVIDIA GeForce RTX 5060 Ti), float32
 
 ## Gates
 
@@ -40,9 +41,9 @@ Per-category cap applied: 926 rows.
 
 ## Timings (seconds)
 
-- normalise: 1.57
-- dedupe: 150.3
-- quality: 60.51
-- safety: 1190.59
-- balance: 2.23
-- total: 1405.2
+- normalise: 1.31
+- dedupe: 31.68
+- quality: 10.9
+- safety: 24.29
+- balance: 1.27
+- total: 69.45

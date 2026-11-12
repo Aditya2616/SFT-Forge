@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from . import export, loaders, pipeline, runjson
+from .models import Models
 from .schema import Config
 
 
@@ -18,13 +19,14 @@ def _progress(stage: str, frac: float) -> None:
 
 def cmd_run(args: argparse.Namespace) -> int:
     cfg = Config.load(args.config)
+    models = Models(cfg.models, device=args.device)
     loaded = loaders.load_path(args.input)
     if loaded.errors:
         print(f"skipped {len(loaded.errors)} unreadable lines (first: {loaded.errors[0]})", file=sys.stderr)
     if args.limit:
         loaded.df = loaded.df.head(args.limit)
     print(f"loaded {len(loaded.df)} rows ({loaded.fmt})", file=sys.stderr)
-    result = pipeline.run(loaded.df, cfg, progress=_progress, load_errors=len(loaded.errors))
+    result = pipeline.run(loaded.df, cfg, models, progress=_progress, load_errors=len(loaded.errors))
     export.export(result, cfg, args.out, source_name=Path(args.input).name)
     if args.run_json:
         meta = {"name": args.name or Path(args.input).stem, "kind": "run", "label": "Recorded run",
@@ -40,7 +42,12 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 
 def cmd_serve(args: argparse.Namespace) -> int:
+    import os
+
     import uvicorn
+
+    if args.device:
+        os.environ["SFTFORGE_DEVICE"] = args.device
 
     uvicorn.run("sftforge.server.app:app", host=args.host, port=args.port, log_level="info")
     return 0
@@ -56,10 +63,12 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--limit", type=int, default=0, help="only use the first N rows")
     r.add_argument("--run-json", default=None, help="also write the compact JSON the web UI replays")
     r.add_argument("--name", default=None)
+    r.add_argument("--device", default=None, help="cpu, cuda or auto (default: auto, or $SFTFORGE_DEVICE)")
     r.set_defaults(fn=cmd_run)
     s = sub.add_parser("serve", help="start the web app")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8104)
+    s.add_argument("--device", default=None, help="cpu, cuda or auto (default: auto, or $SFTFORGE_DEVICE)")
     s.set_defaults(fn=cmd_serve)
     args = p.parse_args(argv)
     return int(args.fn(args))

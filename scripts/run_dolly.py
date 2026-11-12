@@ -30,11 +30,12 @@ def main() -> None:
     ap.add_argument("--rows", type=int, default=5000)
     ap.add_argument("--config", default=str(ROOT / "configs" / "default.yaml"))
     ap.add_argument("--sample", type=int, default=1000)
+    ap.add_argument("--device", default=None, help="cpu, cuda or auto")
     args = ap.parse_args()
     cfg = Config.load(args.config)
     rows = dolly_slice("headline")[: args.rows]
     loaded = load_lines(json.dumps(r) for r in rows)
-    models = Models(cfg.models, cache_dir=ROOT / ".cache")
+    models = Models(cfg.models, cache_dir=ROOT / ".cache", device=args.device)
     res = pipeline.run(loaded.df, cfg, models, progress=lambda s, f: print(f"\r{s} {f:.0%}", end="", flush=True))
     print()
     out = ROOT / "out" / "dolly"
