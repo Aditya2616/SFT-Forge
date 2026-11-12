@@ -1,0 +1,74 @@
+# SFT Forge: spec
+
+Tagline: clean instruction-tuning data, before it ever reaches training.
+
+## 1. Pipeline
+Input: JSONL/JSON in Alpaca (`instruction,input,output`), Dolly (`instruction,context,response,category`), or chat (`messages:[{role,content}]` / ShareGPT `conversations:[{from,value}]`). A loader normalises to a Pandas frame: `id, instruction, context, response, category, source_row`. Multi-turn chats are split into (prompt, reply) pairs with the turn index kept.
+
+Every gate appends to per-record audit columns: `gate`, `verdict` (pass/reject/redact), `reasons: list[str]`, `scores: dict`. A record is rejected at the first failing gate; later gates do not run on it, but scores from gates it passed are kept.
+
+Gate 0, normalise: Unicode NFKC, whitespace collapse, control chars stripped, `[n]` citation markers removed from responses (logged as an edit, not a rejection).
+
+Gate 1, dedupe
+- exact: SHA-1 of normalised (instruction + context + response). Same instruction with different responses is flagged, keeping the higher-scoring one.
+- near: MinHash (datasketch, 5-word shingles, 128 perms) + LSH at Jaccard 0.8 on instruction+response.
+- semantic: all-MiniLM-L6-v2 embeddings on the instruction; cosine >= 0.95 within category (SemDeDup style). Threshold configurable. Reasons name the surviving twin's id and the similarity.
+
+Gate 2, quality (transparent rules; each threshold in YAML; each rule a pure function)
+- length bounds and response/instruction length ratio; alphanumeric ratio (Data-Juicer style); repetition (repeated n-gram share, repeated lines); empty/placeholder text.
+- truncation (ends mid-sentence, dangling bracket or code fence); refusal/boilerplate phrase list.
+- language id (lingua, subset, confidence), allowed languages in config.
+- relevance: cosine(instruction, response) from MiniLM below a threshold, with per-category exemptions.
+- optional perplexity from SmolLM2-135M (off by default for speed; on in the headline run if time allows, reported either way).
+- combined 0-1 quality score for the UI and for balancing tie-breaks; the verdict itself comes from hard rules.
+
+Gate 3, safety
+- PII: email, phone, card (Luhn), IPv4, IBAN, SSN-like; action `redact` to typed placeholders (`[EMAIL]`) by default, or `reject` by config.
+- secrets: AWS/GitHub/Slack/Stripe key patterns, private key blocks, entropy check; always reject.
+- toxicity: unitary/toxic-bert, reject if max over (toxic, severe_toxic, threat, identity_hate) exceeds a threshold on instruction or response; a rule list for self-harm and similar patterns as a second signal. Reasons include class and score. Items whose instruction asks about toxicity (e.g. classification tasks) are allowlisted; limitation stated.
+
+Final stage, balance and export (shown as the SFT set, not a gate)
+- stratified cap per category (default: no category above `max_share`, e.g. 30%), choosing within a category by quality score; optional length-bucket balancing.
+- stratified train/val split (`train_test_split(stratify_by_column="category")` after casting to ClassLabel), seeded.
+- exports: `train.jsonl`/`val.jsonl` (Alpaca schema), chat-messages JSONL, chat-template text via a tokenizer's `apply_chat_template` (SmolLM2), HF `save_to_disk`, `DATASET_CARD.md`, `audit.json` and `audit.md` (counts per gate, per reason, per category before/after, thresholds, model versions, input hash, seed), `rejects.jsonl` with all reasons.
+
+## 2. Layout
+```
+SFT-Forge/
+  pyproject.toml  requirements.txt  .env.example  LICENSE (MIT)  README.md
+  .github/workflows/ci.yml
+  configs/default.yaml  configs/strict.yaml
+  src/sftforge/
+    schema.py       pydantic: Record, Verdict, GateResult, AuditReport, Config
+    loaders.py      Alpaca/Dolly/chat/ShareGPT -> DataFrame
+    normalize.py
+    gates/dedupe.py  quality.py  safety.py   (run(df, cfg) -> df with audit columns)
+    detectors/pii.py secrets.py language.py refusal.py toxicity.py embed.py perplexity.py
+    balance.py  export.py  card.py  audit.py
+    pipeline.py     orchestrates; stream() yields events
+    cli.py          sftforge run | inspect | serve | record-demo
+    server/app.py   FastAPI: GET /health, POST /api/run (pasted JSONL or upload),
+                    GET /api/run/{id}/events (SSE), GET /api/run/{id}/sample/{sid}, GET /api/run/{id}/audit
+  web/              index.html, forge.js, forge.css (served by FastAPI, copied to docs/)
+  docs/             static demo, docs/data/run.json (recorded real run), docs/assets/ screenshots
+  scripts/          fetch_data.py, run_dolly.py (headline numbers), label_sample (threshold check), experiment.py (stretch), shoot.py (Playwright)
+  tests/            fast offline tests + @pytest.mark.slow model tests
+```
+Models load lazily. Fast tests use deterministic stub embedder/toxicity scorers behind the same protocols (`Embedder`, `ToxicityScorer`); the slow marker runs the real models.
+
+## 3. Data flow
+loader -> normalise -> dedupe (exact, near, semantic) -> quality -> safety -> balance -> split -> export + audit. `pipeline.stream()` yields `{id, gate, verdict, reasons, scores}` events in record order; the server relays them over SSE and the recorder dumps them to `run.json`.
+
+## 4. UI (the real version of the site's scene)
+One page, phone first. Header: dataset picker (recorded Dolly run, paste JSONL, upload) and Run. Centre: flow of source stream -> three gates (Dedupe, Quality, Safety) -> SFT set, vertical on phones, horizontal on desktop. A canvas draws real records as small cards; at each gate a rejected card is knocked out sideways in orange with its short reason; survivors (lime) stack in the SFT set, whose category bars fill (the balance). Below: per-gate stat strip (in, out, rejected, top reasons) and a reason histogram. Tapping any card or any row in the virtualised stream log opens an inspector sheet: the text, a per-gate timeline, each rule's measured value vs threshold, scores, redaction diff, the twin for duplicates. Controls: speed, pause, filter by gate/reason/category; threshold sliders and export buttons in live mode only. Demo mode replays `docs/data/run.json`, labelled "Recorded run", with the full audit table. Tokens per the brief; transform/opacity animation only, DPR capped at 2, paused off screen, reduced-motion gives a static step-through.
+
+## 5. Tests (fast, offline)
+Loaders for each format including malformed lines; normalisation; exact and near dup on known pairs; each quality rule with positive and negative cases; Luhn and PII redaction; secrets; toxicity gating with a stub scorer; balance invariants (no category above max_share, deterministic with seed); stratified split proportions; export schema and card; audit totals reconcile (in = kept + sum of rejects); stream event order; FastAPI health, run and SSE via TestClient; CLI smoke. Slow marker: real MiniLM, toxic-bert, SmolLM2 sanity cases. CI: ruff + `pytest -m "not slow"`.
+
+## 6. Done means
+- `sftforge run data.jsonl --config configs/default.yaml --out out/` works from the README on a fresh clone with a new venv.
+- Real run on a 5,000-row Dolly slice (fixed seed) reported: rows in, rejected per gate and reason, final size, category shares before/after, CPU throughput; `scripts/run_dolly.py` reproduces it.
+- Thresholds checked on a hand-labelled sample of about 100 rows, per-gate precision reported, sample committed.
+- UI verified by Playwright screenshots at 1440x900 and 390x844, no console errors; `docs/` demo works from a static server; paste/upload live run works.
+- pytest and ruff green; README with Mermaid diagram, results, limitations (regex PII misses names; toxicity model bias; Dolly already clean; CC BY-SA obligations).
+- Stretch: SmolLM2-135M before/after fine-tune, 3 seeds, reported honestly or omitted.

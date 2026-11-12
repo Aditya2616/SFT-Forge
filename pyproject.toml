@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sftforge"
+version = "0.1.0"
+description = "Clean instruction-tuning data: dedupe, quality, safety, balance."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Aditya Jain" }]
+dependencies = [
+  "pandas>=2.2", "numpy", "datasets>=4.0", "datasketch>=1.6",
+  "lingua-language-detector>=2.0", "pyyaml", "pydantic>=2",
+  "sentence-transformers>=3", "transformers>=4.45", "torch",
+  "fastapi", "uvicorn", "python-multipart",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx", "ruff", "playwright"]
+
+[project.scripts]
+sftforge = "sftforge.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+markers = ["slow: loads real models (deselect with -m 'not slow')"]
+addopts = "-m 'not slow'"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+src = ["src", "tests", "scripts"]
+exclude = [".venv", "data", "out"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008", "E501"]

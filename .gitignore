@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+data/
+out/
+models/
+.env
+.tmp/
+.cache/
+.tmp*
+results/untouched_rejects_*.json
