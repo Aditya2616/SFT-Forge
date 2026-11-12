@@ -1,6 +1,6 @@
-# SFT Forge: research notes (phase 1)
+# SFT Forge: research notes
 
-Date: 2026-11-12. Everything below was checked this session; licences were read from the Hugging Face API card metadata, not from memory.
+Date: 2026-11-12. Everything below was checked when I wrote it; licences were read from the Hugging Face API card metadata, not from memory.
 
 ## 1. What the field does
 
@@ -38,19 +38,16 @@ Datasets
 Models (all CPU-friendly)
 - sentence-transformers/all-MiniLM-L6-v2: apache-2.0, 22.7M params. Near-dup and instruction-response relevance.
 - unitary/toxic-bert: apache-2.0, 109M params. Multi-label toxicity classifier.
-- HuggingFaceTB/SmolLM2-135M: apache-2.0, 135M params. Optional perplexity signal, and base model for the optional experiment.
+- HuggingFaceTB/SmolLM2-135M: apache-2.0, 135M params. Optional perplexity signal (off by default).
 - Rejected on licence: s-nlp/roberta_toxicity_classifier (openrail++), KoalaAI/Text-Moderation (openrail), facebook fasttext lid (cc-by-nc-4.0).
 - Language id: `lingua-language-detector` (Apache-2.0, models bundled, no download), restricted to a language subset for memory. Fallback: `papluca/xlm-roberta-base-language-detection` (MIT, 278M), heavier.
 
 Rule-based pieces (no model): own PII regex with validators (Luhn for cards, email, phone, IPv4, IBAN, SSN-like), secrets patterns in the style of detect-secrets (AWS keys, GitHub tokens, private key headers, high-entropy strings). I will not depend on Presidio: it needs a spaCy model of hundreds of MB for modest gain here. Limitation to state: regex PII misses names and addresses.
 
-Download budget: dolly 13 MB + MiniLM ~90 MB + toxic-bert ~440 MB (safetensors only) + SmolLM2 ~270 MB, under 1 GB.
+Download budget: dolly 13 MB + MiniLM ~90 MB + toxic-bert ~440 MB (safetensors only) + SmolLM2 ~270 MB (only if the perplexity signal is switched on), under 1 GB.
 
 ## 4. Honest expectations
 Dolly is already human-curated, so reject rates will be modest (single digit to low double digit percent). That is a real result and will be reported as is. Dolly does contain true duplicates, empty or very short responses, `[1]`-style Wikipedia citation noise, some PII-like strings and a few toxic items, so each gate should fire. Thresholds will be tuned on a hand-labelled sample, not on the headline numbers.
-
-## 5. Before/after experiment: feasibility
-SmolLM2-135M full fine-tune on CPU, ~3k pairs at 256 tokens, 1 epoch is roughly 6e14 FLOPs, tens of minutes per arm. Feasible. Honest design: same base, same step count, raw slice vs cleaned slice, evaluated on a held-out validation set drawn before cleaning, with loss/perplexity. The effect will likely be small and may be inside noise, so run 3 seeds, report mean and spread, and publish the result even if there is no clear gain. Proposed as a stretch goal after the core ships.
 
 ## Sources
 - AlpaGasus: https://arxiv.org/abs/2307.08701

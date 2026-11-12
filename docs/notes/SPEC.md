@@ -1,4 +1,4 @@
-# SFT Forge: spec
+﻿# SFT Forge: spec
 
 Tagline: clean instruction-tuning data, before it ever reaches training.
 
@@ -49,9 +49,8 @@ SFT-Forge/
     cli.py          sftforge run | inspect | serve | record-demo
     server/app.py   FastAPI: GET /health, POST /api/run (pasted JSONL or upload),
                     GET /api/run/{id}/events (SSE), GET /api/run/{id}/sample/{sid}, GET /api/run/{id}/audit
-  web/              index.html, forge.js, forge.css (served by FastAPI, copied to docs/)
-  docs/             static demo, docs/data/run.json (recorded real run), docs/assets/ screenshots
-  scripts/          fetch_data.py, run_dolly.py (headline numbers), label_sample (threshold check), experiment.py (stretch), shoot.py (Playwright)
+    docs/             the web UI (index.html, forge.js, forge.css), served by FastAPI and as the static demo; docs/data/*.json (recorded real run), docs/assets/ screenshots
+  scripts/          fetch_data.py, run_dolly.py (headline numbers), label_sample (threshold check), shoot.py (Playwright)
   tests/            fast offline tests + @pytest.mark.slow model tests
 ```
 Models load lazily. Fast tests use deterministic stub embedder/toxicity scorers behind the same protocols (`Embedder`, `ToxicityScorer`); the slow marker runs the real models.
@@ -60,7 +59,7 @@ Models load lazily. Fast tests use deterministic stub embedder/toxicity scorers 
 loader -> normalise -> dedupe (exact, near, semantic) -> quality -> safety -> balance -> split -> export + audit. `pipeline.stream()` yields `{id, gate, verdict, reasons, scores}` events in record order; the server relays them over SSE and the recorder dumps them to `run.json`.
 
 ## 4. UI (the real version of the site's scene)
-One page, phone first. Header: dataset picker (recorded Dolly run, paste JSONL, upload) and Run. Centre: flow of source stream -> three gates (Dedupe, Quality, Safety) -> SFT set, vertical on phones, horizontal on desktop. A canvas draws real records as small cards; at each gate a rejected card is knocked out sideways in orange with its short reason; survivors (lime) stack in the SFT set, whose category bars fill (the balance). Below: per-gate stat strip (in, out, rejected, top reasons) and a reason histogram. Tapping any card or any row in the virtualised stream log opens an inspector sheet: the text, a per-gate timeline, each rule's measured value vs threshold, scores, redaction diff, the twin for duplicates. Controls: speed, pause, filter by gate/reason/category; threshold sliders and export buttons in live mode only. Demo mode replays `docs/data/run.json`, labelled "Recorded run", with the full audit table. Tokens per the brief; transform/opacity animation only, DPR capped at 2, paused off screen, reduced-motion gives a static step-through.
+One page, phone first. Header: dataset picker (recorded Dolly run, paste JSONL, upload) and Run. Centre: flow of source stream -> three gates (Dedupe, Quality, Safety) -> SFT set, vertical on phones, horizontal on desktop. A canvas draws real records as small cards; at each gate a rejected card is knocked out sideways in orange with its short reason; survivors (lime) stack in the SFT set, whose category bars fill (the balance). Below: per-gate stat strip (in, out, rejected, top reasons) and a reason histogram. Tapping any card or any row in the virtualised stream log opens an inspector sheet: the text, a per-gate timeline, each rule's measured value vs threshold, scores, redaction diff, the twin for duplicates. Controls: speed, pause, filter by gate/reason/category; threshold sliders and export buttons in live mode only. Demo mode replays `docs/data/*.json`, labelled "Recorded run", with the full audit table. Design tokens follow my portfolio; transform/opacity animation only, DPR capped at 2, paused off screen, reduced-motion gives a static step-through.
 
 ## 5. Tests (fast, offline)
 Loaders for each format including malformed lines; normalisation; exact and near dup on known pairs; each quality rule with positive and negative cases; Luhn and PII redaction; secrets; toxicity gating with a stub scorer; balance invariants (no category above max_share, deterministic with seed); stratified split proportions; export schema and card; audit totals reconcile (in = kept + sum of rejects); stream event order; FastAPI health, run and SSE via TestClient; CLI smoke. Slow marker: real MiniLM, toxic-bert, SmolLM2 sanity cases. CI: ruff + `pytest -m "not slow"`.
@@ -71,4 +70,9 @@ Loaders for each format including malformed lines; normalisation; exact and near
 - Thresholds checked on a hand-labelled sample of about 100 rows, per-gate precision reported, sample committed.
 - UI verified by Playwright screenshots at 1440x900 and 390x844, no console errors; `docs/` demo works from a static server; paste/upload live run works.
 - pytest and ruff green; README with Mermaid diagram, results, limitations (regex PII misses names; toxicity model bias; Dolly already clean; CC BY-SA obligations).
-- Stretch: SmolLM2-135M before/after fine-tune, 3 seeds, reported honestly or omitted.
+
+## 7. Where the build differs from this spec
+- Threshold checking uses a seeded synthetic contamination benchmark (`scripts/make_benchmark.py`, `scripts/eval_benchmark.py`) with known defects and ground truth, tuned on a dev slice and reported on a separate bench slice, instead of a hand-labelled sample. There is no `label_sample` script.
+- There is a single config, `configs/default.yaml`; no `strict.yaml`.
+- The web UI lives in `docs/` only and is served from there by FastAPI.
+- The before/after fine-tuning experiment was dropped and is not part of this project.
