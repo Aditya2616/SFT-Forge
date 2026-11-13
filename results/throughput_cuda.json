@@ -4,13 +4,19 @@
   "threads": 2,
   "logical_cores": 12,
   "timings_s": {
-    "normalise": 0.08,
-    "dedupe": 12.76,
-    "quality": 1.1,
-    "safety": 6.42,
-    "balance": 0.14,
-    "total": 20.5
+    "normalise": 0.04,
+    "dedupe": 7.53,
+    "quality": 0.55,
+    "safety": 1.92,
+    "balance": 0.07,
+    "total": 10.1
   },
-  "rows_per_second": 24.4,
-  "rows_kept": 492
+  "rows_per_second": 49.5,
+  "rows_kept": 492,
+  "load": {
+    "cpu_busy_before": 0.06,
+    "gpu_busy_before_pct": 0,
+    "cpu_busy_during": 0.182,
+    "cpu_busy_during_other": 0.098
+  }
 }

@@ -4,13 +4,18 @@
   "threads": 3,
   "logical_cores": 12,
   "timings_s": {
-    "normalise": 0.12,
-    "dedupe": 41.8,
-    "quality": 9.84,
-    "safety": 163.84,
-    "balance": 0.21,
-    "total": 215.81
+    "normalise": 0.04,
+    "dedupe": 13.75,
+    "quality": 2.85,
+    "safety": 64.38,
+    "balance": 0.08,
+    "total": 81.11
   },
-  "rows_per_second": 2.3,
-  "rows_kept": 492
+  "rows_per_second": 6.2,
+  "rows_kept": 492,
+  "load": {
+    "cpu_busy_before": 0.126,
+    "cpu_busy_during": 0.381,
+    "cpu_busy_during_other": 0.146
+  }
 }

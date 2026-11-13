@@ -200,13 +200,22 @@ def block_demo(s: dict) -> str:
 def block_throughput(s: dict) -> str:
     c, g = s["tp_cpu"], s["tp_gpu"]
     assert c["rows"] == g["rows"]
+    quiet = 0.25  # a run counts as taken on a quiet machine when the other load stayed under this fraction
+    for r in (c, g):
+        ld = r["load"]
+        assert ld["cpu_busy_before"] < quiet and ld["cpu_busy_during_other"] < quiet, "throughput was not measured on a quiet CPU"
+    assert g["load"]["gpu_busy_before_pct"] < 25, "the GPU throughput run did not start on an idle GPU"
+    pc = lambda x: f"{100 * x:.0f}%"  # noqa: E731
+    cl, gl = c["load"], g["load"]
     return (f"- CPU throughput is the limit on machines without a GPU. `scripts/throughput.py` times the first {c['rows']} "
             f"rows of the committed sample with model loading included: {c['timings_s']['total']:.0f} s on the CPU "
             f"({c['threads']} threads, {c['rows_per_second']} rows per second, safety {c['timings_s']['safety']:.0f} s) and "
-            f"{g['timings_s']['total']:.0f} s on the GPU ({g['rows_per_second']} rows per second). The machine and its GPU were "
-            "shared with other jobs, so these figures vary several-fold between runs and are indicative only. Live mode is "
-            "capped at 500 rows for that reason.")
-
+            f"{g['timings_s']['total']:.0f} s on the GPU ({g['rows_per_second']} rows per second). Both were measured on an "
+            f"otherwise idle machine: the CPU run started with the CPU {pc(cl['cpu_busy_before'])} busy and other programs used about "
+            f"{pc(cl['cpu_busy_during_other'])} of it during the run; the GPU run started with the CPU {pc(gl['cpu_busy_before'])} busy, "
+            f"other programs used about {pc(gl['cpu_busy_during_other'])} during the run, and the GPU was {g['load']['gpu_busy_before_pct']}% "
+            "utilised before it. Each figure is one run on one machine, so it is indicative, not an average. Live mode is capped at "
+            "500 rows because of this cost.")
 
 
 def block_perplexity(s: dict) -> str:
