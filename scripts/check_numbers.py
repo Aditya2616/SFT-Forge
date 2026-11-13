@@ -333,20 +333,34 @@ def block_ft_verdict(s: dict) -> str:
             f"(cleaned) and {mean('random', 'loss'):.3f} (random), and ROUGE-L rose from {mean('base', 'rouge_l'):.3f} to "
             f"{mean('raw', 'rouge_l'):.3f}, {mean('cleaned', 'rouge_l'):.3f} and {mean('random', 'rouge_l'):.3f}.")
     parts = [head]
+    explained = False
+
+    def short(label: str) -> str:
+        base = label.split(" (")[0]
+        first = base.split(" ")[0]
+        return base if any(ch.isupper() for ch in first[1:]) else base[0].lower() + base[1:]
+
     for key, name in (("cleaned_minus_raw", "raw"), ("cleaned_minus_random", "the size-matched random subsample")):
-        better = [f"{m['label'][0].lower() + m['label'][1:]} ({sgn(m['key'], f['paired'][key][m['key']]['mean_diff'])})" for m in f["metrics"]
+        better = [f"{short(m['label'])} ({sgn(m['key'], f['paired'][key][m['key']]['mean_diff'])})" for m in f["metrics"]
                   if f["paired"][key][m["key"]]["favours_cleaned"] is True]
-        worse = [f"{m['label'][0].lower() + m['label'][1:]} ({sgn(m['key'], f['paired'][key][m['key']]['mean_diff'])})" for m in f["metrics"]
+        worse = [f"{short(m['label'])} ({sgn(m['key'], f['paired'][key][m['key']]['mean_diff'])})" for m in f["metrics"]
                  if f["paired"][key][m["key"]]["favours_cleaned"] is False]
         if not better and not worse:
             parts.append(f"Against {name}, no measure had a paired {n_seeds}-seed 95% interval that excludes zero.")
-        else:
-            bits = []
-            if better:
-                bits.append("statistically better on " + "; ".join(better))
-            if worse:
-                bits.append("statistically worse on " + "; ".join(worse))
-            parts.append(f"Against {name}, the cleaned set was " + " and ".join(bits) + ", meaning the {n}-seed 95% interval excludes zero.".replace("{n}", str(n_seeds)))
+            continue
+
+        def joined(items: list[str]) -> str:
+            return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and on " + items[-1]
+
+        bits = []
+        if better:
+            bits.append("statistically better on " + joined(better))
+        if worse:
+            bits.append("statistically worse on " + joined(worse))
+        subject = "the cleaned set was" if not explained else "it was"
+        tail = ", on the same criterion." if explained else f", meaning the {n_seeds}-seed 95% interval excludes zero."
+        explained = True
+        parts.append(f"Against {name}, {subject} " + " and ".join(bits) + tail)
     return " ".join(parts)
 
 

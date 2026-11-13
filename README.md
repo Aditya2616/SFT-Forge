@@ -1,16 +1,21 @@
 # SFT Forge
 
+[![CI](https://github.com/Aditya2616/SFT-Forge/actions/workflows/ci.yml/badge.svg)](https://github.com/Aditya2616/SFT-Forge/actions/workflows/ci.yml)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
+
 **Clean instruction-tuning data, before it ever reaches training.**
 
 SFT Forge takes candidate instruction-response pairs (Alpaca, Dolly, chat-messages or ShareGPT JSONL) and passes them through three gates: **dedupe**, **quality** and **safety**. The survivors are balanced across categories, split into train and validation, and exported as a supervised fine-tuning set together with an audit report. Every rejected row keeps its reasons and the measured scores that caused them, so nothing is dropped silently.
 
+On the one downstream test I ran (a 135M model, three seeds), cleaning made no practical difference; the gates are measured against injected defects, not shown to improve models (see Results).
+
 Stack: Python, Pandas, Hugging Face Datasets. It runs fully offline on CPU after a one-time model download and needs no API keys.
 
-![The pipeline streaming a recorded run](docs/assets/desktop-streaming.png)
+![The pipeline after a recorded run on the synthetic benchmark: lanes of kept and rejected samples, gate counters and the category mix](docs/assets/desktop-streaming.png)
 
 <p>
-<img src="docs/assets/phone-streaming.png" alt="Phone layout" width="240">
-<img src="docs/assets/phone-inspector.png" alt="Per-sample inspector on a phone" width="240">
+<img src="docs/assets/phone-streaming.png" alt="Phone layout of the finished run: the pipeline lanes and gate counters" width="260">
+<img src="docs/assets/phone-inspector.png" alt="The per-sample inspector on a phone, listing every rule's measured value against its threshold" width="260">
 </p>
 
 The screenshots show the synthetic-contamination run, where rejections are frequent enough to watch. The web UI (in `docs/`) replays two real recorded runs, or runs your own pasted or uploaded JSONL through the local server. Samples that fail a gate flash orange where they were caught and are knocked out of the lane with their reason code; survivors turn lime as they land in the SFT set. Tap any sample to see why it was rejected first, then every rule's measured value against its threshold.
@@ -43,56 +48,6 @@ The frame carries audit columns (`status`, `gate`, `reasons`, `scores`). A row i
 - **Balance and export:** no category may exceed `max_share` of the final set (skipped below 100 survivors), then a seeded stratified split.
 
 All thresholds are in [`configs/default.yaml`](configs/default.yaml).
-
-## Quickstart
-
-Python 3.11+ (developed on 3.13). It runs on CPU; if a CUDA build of PyTorch is installed it uses the GPU automatically. On a machine without a GPU you can save a large download by installing the CPU build of PyTorch before the project (I did not run this command, since PyTorch was already installed here):
-
-```bash
-pip install torch --index-url https://download.pytorch.org/whl/cpu
-```
-
-The first run downloads two small models (about 0.5 GB) from Hugging Face.
-
-```bash
-git clone https://github.com/Aditya2616/SFT-Forge.git
-cd SFT-Forge
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
-
-# 1. a small messy file I wrote for this: duplicates, cut-off answers, refusals, PII, fake secrets
-sftforge run examples/messy_sample.jsonl --config configs/default.yaml --out out/messy
-cat out/messy/audit.md
-
-# 2. the committed Dolly sample, already cleaned, so nearly everything is kept
-sftforge run data_sample/dolly_cleaned_sample.jsonl --config configs/default.yaml --out out/sample
-
-# web UI with live mode (paste or upload JSONL)
-sftforge serve --port 8104       # then open http://127.0.0.1:8104/
-
-# the device is picked automatically (cuda if available, else cpu); override with
-#   --device cpu   or   SFTFORGE_DEVICE=cpu
-```
-
-`examples/messy_sample.jsonl` has 60 rows I wrote (MIT, not Dolly): clean rows across eight categories plus exact, near and paraphrase duplicates, cut-off answers, refusals and boilerplate, two wrong-language rows, two off-topic answers, emails, phone numbers and a test card number to redact, two obviously fake secrets in documented example formats, and one mildly toxic row. Running it on the CPU gave this audit (`scripts/record_messy.py` stores it in `results/messy_sample_audit.json`; it matches `out/messy/audit.md`):
-
-<!-- gen:messy -->
-| Gate | In | Rejected | Out | Reasons |
-|---|---:|---:|---:|---|
-| dedupe | 60 | 6 | 54 | exact 2, near 2, semantic 2 |
-| quality | 54 | 12 | 42 | refusal 5, truncated 3, off topic 2, wrong language 2 |
-| safety | 42 | 3 | 39 | secret 2, toxicity 1 |
-| balance | 39 | 0 | 39 | none |
-
-39 of 60 rows are kept (31 train, 8 validation); 2 emails, 2 phone numbers and 1 card number were redacted in kept rows, and 21 rows were rejected.
-<!-- /gen:messy -->
-
-Every injected defect was caught and no clean row was rejected, but the file is small and I wrote it to be caught, so it shows what each gate does and is not a measurement (see Results for those). The same file loads behind the **Load a messy example** button in the web UI's "Your data" tab, so you can run it live in one tap.
-
-`out/<name>/` contains `train.jsonl`, `val.jsonl`, chat-format files, a Hugging Face dataset, `DATASET_CARD.md`, `audit.json`, `audit.md` and `rejects.jsonl`. To host the demo statically, serve `docs/` with any file server; recorded runs need no backend.
-
-Live mode limits: 500 rows and 2 MB per request (`SFTFORGE_MAX_ROWS`, `SFTFORGE_MAX_UPLOAD_BYTES`), input and results held in memory (the zip export is built in a temporary folder that is deleted afterwards), nothing executed. The model choice and its revisions cannot be changed from a request.
 
 ## Results
 
@@ -194,7 +149,7 @@ As implemented, the check is a net loss, so I left it off. It adds no recall on 
 
 The benchmark shows that the gates catch injected defects. This section asks the downstream question: does a small model trained on the cleaned data behave better than one trained on the contaminated data? After `python scripts/fetch_data.py` and `python scripts/make_benchmark.py --slice bench --seed 2026`, `python scripts/finetune_compare.py` trains and scores every run (it resumes from `results/finetune/runs/`), then writes `results/finetune/results.json`, which the web UI's "Does cleaning help a model?" section reads. No weights are saved.
 
-![The fine-tuning comparison in the web UI](docs/assets/desktop-finetune.png)
+![The fine-tuning comparison in the web UI: raw, cleaned and random training sets against the untuned model](docs/assets/desktop-finetune.png)
 
 <!-- gen:ft_setup -->
 SmolLM2-135M-Instruct was fine-tuned in float32 on the GPU for 400 optimiser steps of 8 examples (micro-batches of 1), AdamW at a peak learning rate of 2e-05 with 20 warm-up steps and cosine decay, loss on the response tokens only, 3 seeds per training set. A run took 7.3 to 21.6 minutes of training and used at most 3.3 GiB of GPU memory (reserved; capped at 3.9 GiB). Device: `cuda (NVIDIA GeForce RTX 5060 Ti), float32`.
@@ -234,14 +189,90 @@ Paired by seed, with a 95% t-interval over the seeds (a seed fixes the data orde
 <!-- /gen:ft_paired -->
 
 <!-- gen:ft_verdict -->
-All three fine-tuned sets moved the model the same way and by about the same amount: held-out loss fell from 2.419 for the untuned model to 2.244 (raw), 2.246 (cleaned) and 2.246 (random), and ROUGE-L rose from 0.184 to 0.251, 0.257 and 0.251. Against raw, the cleaned set was statistically worse on held-out loss (reference answers) (+0.002); outputs that stop mid-sentence (+0.3 pts), meaning the 3-seed 95% interval excludes zero. Against the size-matched random subsample, the cleaned set was statistically better on miniLM cosine similarity to the reference (+0.009), meaning the 3-seed 95% interval excludes zero.
+All three fine-tuned sets moved the model the same way and by about the same amount: held-out loss fell from 2.419 for the untuned model to 2.244 (raw), 2.246 (cleaned) and 2.246 (random), and ROUGE-L rose from 0.184 to 0.251, 0.257 and 0.251. Against raw, the cleaned set was statistically worse on held-out loss (+0.002) and on outputs that stop mid-sentence (+0.3 pts), meaning the 3-seed 95% interval excludes zero. Against the size-matched random subsample, it was statistically better on MiniLM cosine similarity to the reference (+0.009), on the same criterion.
 <!-- /gen:ft_verdict -->
 
 **Reading it plainly.** At this scale, cleaning with SFT Forge made no practical difference to the model. Fine-tuning on any of the three sets moved the model toward the Dolly answer style and improved the loss and the ROUGE-L score by the same amount, and the differences between the sets are within a few thousandths on loss and about a hundredth on the similarity scores, or amount to a single prompt out of the held-out set. Where an interval excludes zero (see the paired table), the effect is tiny and points in different directions for different measures: against the raw set the flagged differences are on held-out loss and on one output that stops mid-sentence, both slightly in raw's favour, and against the size-matched random subsample the only flagged difference is a MiniLM similarity gain of about a hundredth. With eight measures and three seeds, one borderline interval is weak evidence, so I cannot attribute any gain to the cleaning rather than to chance or to the size of the set.
 
 Likely reasons, none of which I have tested here: the defects are a modest share of the data (a fifth of the rows, split over many types), and one pass of a short budget teaches a small instruction-tuned model mostly the answer style, not individual defects; duplicates and memorised rows matter most when a set is repeated for several epochs, and here each set is seen about once, so verbatim copying never appears; the held-out prompts are ordinary questions that rarely invite a refusal or a different language; with 300 prompts one output moves a rate by a third of a percentage point, so rare behaviours are below the resolution of this evaluation; and the base model is already instruction-tuned, so there is little refusal boilerplate for contaminated data to add. A larger model, a longer or multi-epoch run, a higher contamination rate, or an evaluation aimed at the specific defects might show an effect; this experiment does not.
 
-## The recorded demo format
+## Quickstart
+
+Python 3.11+ (developed on 3.13). It runs on CPU; if a CUDA build of PyTorch is installed it uses the GPU automatically. On a machine without a GPU you can save a large download by installing the CPU build of PyTorch before the project (optional; skip it if PyTorch is already installed):
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+```
+
+The first run downloads two small models (about 0.5 GB) from Hugging Face.
+
+```bash
+git clone https://github.com/Aditya2616/SFT-Forge.git
+cd SFT-Forge
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+
+# 1. a small messy file I wrote for this: duplicates, cut-off answers, refusals, PII, fake secrets
+sftforge run examples/messy_sample.jsonl --config configs/default.yaml --out out/messy
+cat out/messy/audit.md
+
+# 2. the committed Dolly sample, already cleaned, so nearly everything is kept
+sftforge run data_sample/dolly_cleaned_sample.jsonl --config configs/default.yaml --out out/sample
+
+# web UI with live mode (paste or upload JSONL)
+sftforge serve --port 8104       # then open http://127.0.0.1:8104/
+
+# the device is picked automatically (cuda if available, else cpu); override with
+#   --device cpu   or   SFTFORGE_DEVICE=cpu
+```
+
+`examples/messy_sample.jsonl` has 60 rows I wrote (MIT, not Dolly): clean rows across eight categories plus exact, near and paraphrase duplicates, cut-off answers, refusals and boilerplate, two wrong-language rows, two off-topic answers, emails, phone numbers and a test card number to redact, two obviously fake secrets in documented example formats, and one mildly toxic row. Running it on the CPU gave this audit (`scripts/record_messy.py` stores it in `results/messy_sample_audit.json`; it matches `out/messy/audit.md`):
+
+<!-- gen:messy -->
+| Gate | In | Rejected | Out | Reasons |
+|---|---:|---:|---:|---|
+| dedupe | 60 | 6 | 54 | exact 2, near 2, semantic 2 |
+| quality | 54 | 12 | 42 | refusal 5, truncated 3, off topic 2, wrong language 2 |
+| safety | 42 | 3 | 39 | secret 2, toxicity 1 |
+| balance | 39 | 0 | 39 | none |
+
+39 of 60 rows are kept (31 train, 8 validation); 2 emails, 2 phone numbers and 1 card number were redacted in kept rows, and 21 rows were rejected.
+<!-- /gen:messy -->
+
+Every injected defect was caught and no clean row was rejected, but the file is small and I wrote it to be caught, so it shows what each gate does and is not a measurement (see Results for those). The same file loads behind the **Load a messy example** button in the web UI's "Your data" tab, so you can run it live in one tap.
+
+`out/<name>/` contains `train.jsonl`, `val.jsonl`, chat-format files, a Hugging Face dataset, `DATASET_CARD.md`, `audit.json`, `audit.md` and `rejects.jsonl`. To host the demo statically, serve `docs/` with any file server; recorded runs need no backend.
+
+Live mode limits: 500 rows and 2 MB per request (`SFTFORGE_MAX_ROWS`, `SFTFORGE_MAX_UPLOAD_BYTES`), input and results held in memory (the zip export is built in a temporary folder that is deleted afterwards), nothing executed. The model choice and its revisions cannot be changed from a request.
+
+## Reproduce and test
+
+```bash
+ruff check .
+pytest                # fast offline tests with a stub embedder and toxicity scorer
+pytest -m slow        # tests with the real MiniLM and toxic-bert models
+python scripts/check_numbers.py --check   # README numbers match the results files (--write regenerates them)
+```
+
+CI (`.github/workflows/ci.yml`) runs lint and the fast tests. The web UI is checked with headless Chromium scripts (`scripts/shoot.py`, `scripts/check_ui.py`) at 1440x900 and 390x844 with touch, in served and static modes.
+
+## Layout
+
+```
+src/sftforge/   loaders, normalize, gates/, detectors/, balance, export, card, audit, pipeline, cli, server/
+configs/        default.yaml (every threshold)
+scripts/        fetch_data, make_benchmark, eval_benchmark, eval_perplexity, finetune_compare, run_dolly, record_messy, throughput, check_numbers, smoke, shoot, check_ui
+docs/           web UI (served locally and as a static demo), data/ recorded runs, assets/, notes/ (research, spec)
+examples/       messy_sample.jsonl: 60 hand-written rows with every defect type (MIT)
+data_sample/    1,000 cleaned Dolly rows (CC BY-SA 3.0, see `data_sample/NOTICE.md`)
+results/        measured outputs behind the numbers above
+tests/
+```
+
+## Static demo and recorded runs
+
+There is no hosted demo yet; the `docs/` folder is a complete static site, so it can be served by GitHub Pages or any file server (`python -m http.server --directory docs`).
 
 The static demo must load quickly on a phone, so a recorded run is an index plus chunks, written by `scripts/run_dolly.py` and `scripts/eval_benchmark.py --recorded-dir`:
 
@@ -272,30 +303,6 @@ Text is clipped in the detail files (instruction 240, context 120, response 380 
 <!-- /gen:throughput -->
 - The fine-tuning comparison is small: one 135M-parameter model, one contaminated slice with defects I injected, a short training budget, three seeds and a 300-row held-out set. It says what these defects teach this model under this budget, and it cannot speak to larger models, real web data or longer training.
 - Only the local pipeline paths are implemented; there are no hosted-model adapters.
-
-## Tests
-
-```bash
-ruff check .
-pytest                # fast offline tests with a stub embedder and toxicity scorer
-pytest -m slow        # tests with the real MiniLM and toxic-bert models
-python scripts/check_numbers.py --check   # README numbers match the results files (--write regenerates them)
-```
-
-CI (`.github/workflows/ci.yml`) runs lint and the fast tests. The web UI is checked with headless Chromium scripts (`scripts/shoot.py`, `scripts/check_ui.py`) at 1440x900 and 390x844 with touch, in served and static modes.
-
-## Layout
-
-```
-src/sftforge/   loaders, normalize, gates/, detectors/, balance, export, card, audit, pipeline, cli, server/
-configs/        default.yaml (every threshold)
-scripts/        fetch_data, make_benchmark, eval_benchmark, eval_perplexity, finetune_compare, run_dolly, record_messy, throughput, check_numbers, smoke, shoot, check_ui
-docs/           web UI (served locally and as a static demo), data/ recorded runs, assets/, notes/ (research, spec)
-examples/       messy_sample.jsonl: 60 hand-written rows with every defect type (MIT)
-data_sample/    1,000 cleaned Dolly rows (CC BY-SA 3.0, see NOTICE.md)
-results/        measured outputs behind the numbers above
-tests/
-```
 
 ## Credits and licences
 

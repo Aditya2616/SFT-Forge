@@ -53,7 +53,7 @@ button { cursor: pointer; }
 
 /* header */
 .top { position: sticky; top: 0; z-index: 30; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  background: color-mix(in srgb, var(--void) 78%, transparent); border-bottom: 1px solid var(--line); }
+  background: color-mix(in srgb, var(--void) 96%, transparent); border-bottom: 1px solid var(--line); }
 .top .wrap { display: flex; align-items: center; gap: 14px; height: 56px; }
 .brand { font-family: var(--mono); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; text-decoration: none; display: flex; align-items: center; gap: 10px; }
 .brand i { width: 9px; height: 9px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 14px var(--lime); display: inline-block; }
